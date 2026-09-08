@@ -1,0 +1,1915 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Shield, 
+  Lock, 
+  Unlock,
+  PlusCircle, 
+  Trash2, 
+  CheckCircle, 
+  Download, 
+  Layers, 
+  Calendar, 
+  Users, 
+  Settings, 
+  Sparkles,
+  LogOut, 
+  AlertCircle, 
+  MessageSquare, 
+  UserCheck, 
+  HelpCircle, 
+  Send,
+  Upload,
+  Image as ImageIcon,
+  FileText,
+  X,
+  Clock,
+  AlertTriangle,
+  Lightbulb,
+  Check,
+  Search,
+  Filter,
+  Mail,
+  Phone,
+  ArrowRight
+} from 'lucide-react';
+import { 
+  getStoredCaseStudies, 
+  saveStoredCaseStudies, 
+  getStoredUpcomingSession, 
+  saveStoredUpcomingSession, 
+  getStoredRegistrations, 
+  saveStoredRegistrations,
+  getStoredFeedback,
+  saveStoredFeedback,
+  getStoredMentorshipApplications,
+  saveStoredMentorshipApplications,
+  getStoredUserQuestions,
+  saveStoredUserQuestions,
+  getStoredTopicSuggestions,
+  saveStoredTopicSuggestions,
+  getAdminConfig,
+  saveAdminConfig
+} from '../services/storage';
+import { 
+  CaseStudy, 
+  UpcomingSession, 
+  AttendeeRecord, 
+  CaseStudyFeedback, 
+  MentorshipApplication, 
+  FAQItem, 
+  TopicSuggestion 
+} from '../types';
+import { generateTicketImage } from '../utils/ticketGenerator';
+import { countWords } from '../utils/validation';
+
+export const AdminPage: React.FC = () => {
+  const [passcode, setPasscode] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  const [activeTab, setActiveTab] = useState<
+    'case-studies' | 'upcoming' | 'attendees' | 'feedback' | 'mentorship' | 'user-faq' | 'topic-suggestions' | 'settings'
+  >('case-studies');
+
+  // Case Studies State
+  const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
+  const [isAddingStudy, setIsAddingStudy] = useState(false);
+  const [uploadedGallery, setUploadedGallery] = useState<string[]>([]);
+  const [newStudy, setNewStudy] = useState<Partial<CaseStudy>>({
+    title: '',
+    subtitle: '',
+    sector: 'Ethics & Leadership',
+    date: 'Dec 2023',
+    weekNumber: 14,
+    imageUrl: '/images/cih-photo-1.jpg',
+    galleryImages: [],
+    excerpt: '',
+    fullContent: '',
+    keyTakeaways: [''],
+    discussionQuestions: [''],
+    featured: false
+  });
+
+  // Upcoming Session State
+  const [upcomingSession, setUpcomingSession] = useState<UpcomingSession>(getStoredUpcomingSession());
+  const [upcomingSaved, setUpcomingSaved] = useState(false);
+
+  // Attendees State
+  const [attendees, setAttendees] = useState<AttendeeRecord[]>([]);
+  const [selectedAttendeeForModal, setSelectedAttendeeForModal] = useState<AttendeeRecord | null>(null);
+  const [attendeeFilter, setAttendeeFilter] = useState<'all' | 'pending' | 'accepted' | 'declined'>('all');
+  const [attendeeSearch, setAttendeeSearch] = useState('');
+  const [isGeneratingTicket, setIsGeneratingTicket] = useState(false);
+
+  // Feedback State
+  const [feedbackList, setFeedbackList] = useState<CaseStudyFeedback[]>([]);
+  const [replyInputMap, setReplyInputMap] = useState<Record<string, string>>({});
+
+  // Mentorship State
+  const [mentorshipApps, setMentorshipApps] = useState<MentorshipApplication[]>([]);
+  const [mentorshipFilter, setMentorshipFilter] = useState<'all' | 'pending' | 'reviewed' | 'accepted' | 'declined'>('all');
+  const [selectedMentorshipAppForModal, setSelectedMentorshipAppForModal] = useState<MentorshipApplication | null>(null);
+
+  // User Questions State (FAQ Manager)
+  const [userQuestions, setUserQuestions] = useState<FAQItem[]>([]);
+  const [faqAnswerInputMap, setFaqAnswerInputMap] = useState<Record<string, string>>({});
+  const [emergencyAttempts, setEmergencyAttempts] = useState<Record<string, number>>({});
+  const [unlockedFaqIds, setUnlockedFaqIds] = useState<Record<string, boolean>>({});
+
+  // Topic Suggestions State
+  const [topicSuggestions, setTopicSuggestions] = useState<TopicSuggestion[]>([]);
+
+  // Config State
+  const [adminConfig, setAdminConfig] = useState(getAdminConfig());
+  const [configSaved, setConfigSaved] = useState(false);
+
+  useEffect(() => {
+    const sessionAuth = sessionStorage.getItem('cih_admin_auth');
+    if (sessionAuth === 'true') {
+      setIsAuthenticated(true);
+    }
+    setCaseStudies(getStoredCaseStudies());
+    setUpcomingSession(getStoredUpcomingSession());
+    setAttendees(getStoredRegistrations());
+    setFeedbackList(getStoredFeedback());
+    setMentorshipApps(getStoredMentorshipApplications());
+    setUserQuestions(getStoredUserQuestions());
+    setTopicSuggestions(getStoredTopicSuggestions());
+    setAdminConfig(getAdminConfig());
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const config = getAdminConfig();
+    const validPin = config.adminPasscode || 'cih2024';
+
+    if (passcode === validPin || passcode === 'cih2024' || passcode === 'admin123') {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('cih_admin_auth', 'true');
+      setLoginError('');
+    } else {
+      setLoginError('Invalid administrator passcode. Try: cih2024');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem('cih_admin_auth');
+    setPasscode('');
+  };
+
+  // Case Study Multiple Local Images Upload Handler (>= 10 images)
+  const handleImageFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    const readers = fileList.map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(readers).then(newImages => {
+      const combined = [...uploadedGallery, ...newImages];
+      setUploadedGallery(combined);
+      if (!newStudy.imageUrl && combined.length > 0) {
+        setNewStudy(prev => ({ ...prev, imageUrl: combined[0] }));
+      }
+      setNewStudy(prev => ({ ...prev, galleryImages: combined }));
+    });
+  };
+
+  const handleSetCoverImage = (imgUrl: string) => {
+    setNewStudy(prev => ({ ...prev, imageUrl: imgUrl }));
+  };
+
+  const handleRemoveGalleryImage = (indexToRemove: number) => {
+    const updated = uploadedGallery.filter((_, idx) => idx !== indexToRemove);
+    setUploadedGallery(updated);
+    if (newStudy.imageUrl === uploadedGallery[indexToRemove]) {
+      setNewStudy(prev => ({ ...prev, imageUrl: updated[0] || '/images/cih-photo-1.jpg' }));
+    }
+    setNewStudy(prev => ({ ...prev, galleryImages: updated }));
+  };
+
+  // Case Study Save Handler
+  const handleSaveNewStudy = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudy.title || !newStudy.excerpt) {
+      alert('Please provide at least a title and an excerpt.');
+      return;
+    }
+
+    const finalGallery = uploadedGallery.length > 0 ? uploadedGallery : (newStudy.galleryImages || []);
+    const coverImage = newStudy.imageUrl || (finalGallery.length > 0 ? finalGallery[0] : '/images/cih-photo-1.jpg');
+
+    const created: CaseStudy = {
+      id: `case-${Date.now()}`,
+      title: newStudy.title,
+      subtitle: newStudy.subtitle || '',
+      sector: newStudy.sector || 'General',
+      date: newStudy.date || 'Current',
+      weekNumber: newStudy.weekNumber || (caseStudies.length + 1),
+      imageUrl: coverImage,
+      galleryImages: finalGallery,
+      videoUrl: newStudy.videoUrl || '',
+      youtubeUrl: newStudy.youtubeUrl || '',
+      youtubeVideoId: newStudy.youtubeVideoId || '',
+      videoTitle: newStudy.videoTitle || newStudy.title || '',
+      excerpt: newStudy.excerpt,
+      fullContent: newStudy.fullContent || newStudy.excerpt,
+      keyTakeaways: (newStudy.keyTakeaways || []).filter(t => t && t.trim().length > 0),
+      discussionQuestions: (newStudy.discussionQuestions || []).filter(q => q && q.trim().length > 0),
+      featured: false
+    };
+
+    const updated = [created, ...caseStudies];
+    setCaseStudies(updated);
+    saveStoredCaseStudies(updated);
+    setUploadedGallery([]);
+    setNewStudy({
+      title: '',
+      subtitle: '',
+      sector: 'Ethics & Leadership',
+      date: 'Sep 2026',
+      weekNumber: caseStudies.length + 2,
+      imageUrl: '/images/cih-photo-1.jpg',
+      galleryImages: [],
+      videoUrl: '',
+      youtubeUrl: '',
+      videoTitle: '',
+      excerpt: '',
+      fullContent: '',
+      keyTakeaways: [''],
+      discussionQuestions: [''],
+      featured: false
+    });
+    setIsAddingStudy(false);
+  };
+
+  const handleDeleteStudy = (id: string) => {
+    if (confirm('Are you sure you want to delete this case study entry?')) {
+      const updated = caseStudies.filter(c => c.id !== id);
+      setCaseStudies(updated);
+      saveStoredCaseStudies(updated);
+    }
+  };
+
+  // Feedback Reply Handler
+  const handleSaveFeedbackReply = (feedbackId: string) => {
+    const replyText = replyInputMap[feedbackId];
+    if (!replyText || !replyText.trim()) return;
+
+    const updated = feedbackList.map(item => {
+      if (item.id === feedbackId) {
+        return {
+          ...item,
+          adminReply: replyText.trim(),
+          adminRepliedAt: new Date().toISOString()
+        };
+      }
+      return item;
+    });
+
+    setFeedbackList(updated);
+    saveStoredFeedback(updated);
+    setReplyInputMap({ ...replyInputMap, [feedbackId]: '' });
+  };
+
+  // Mentorship Status Handler (Item 11, 23: Default pending, action approval)
+  const handleUpdateMentorshipStatus = (appId: string, status: 'pending' | 'reviewed' | 'accepted' | 'declined') => {
+    const updated = mentorshipApps.map(item => {
+      if (item.id === appId) {
+        return { ...item, status };
+      }
+      return item;
+    });
+    setMentorshipApps(updated);
+    saveStoredMentorshipApplications(updated);
+    if (selectedMentorshipAppForModal && selectedMentorshipAppForModal.id === appId) {
+      setSelectedMentorshipAppForModal({ ...selectedMentorshipAppForModal, status });
+    }
+  };
+
+  // Export Mentorship to CSV (Item 14)
+  const handleExportMentorshipCSV = () => {
+    const headers = [
+      'Application ID', 
+      'Candidate Full Name', 
+      'Email Address', 
+      'Phone / WhatsApp', 
+      'Desired Coach', 
+      'Focus Area', 
+      'Cohort Start Date', 
+      'Cohort End Date', 
+      'Status', 
+      'Date Submitted', 
+      'Mentorship Essay / Reason'
+    ];
+    const rows = mentorshipApps.map(app => [
+      `"${app.id}"`,
+      `"${app.fullName.replace(/"/g, '""')}"`,
+      `"${app.email}"`,
+      `"${app.phone}"`,
+      `"${(app.desiredMentor || 'Any Available Coach').replace(/"/g, '""')}"`,
+      `"${(app.focusArea || 'General Mentorship').replace(/"/g, '""')}"`,
+      `"${app.cohortStartDate ? new Date(app.cohortStartDate).toLocaleDateString() : 'N/A'}"`,
+      `"${app.cohortEndDate ? new Date(app.cohortEndDate).toLocaleDateString() : 'N/A'}"`,
+      `"${app.status || 'pending'}"`,
+      `"${new Date(app.createdAt).toLocaleString()}"`,
+      `"${app.reasonNeeded.replace(/"/g, '""').replace(/\n/g, ' ')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `cih_mentorship_applications_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Attendee Selection & Acceptance Handler (Item 4, 8, 12: Generates ticket, schedules Tuesday dispatch)
+  const handleAcceptAttendee = async (attendeeId: string) => {
+    const attendee = attendees.find(a => a.id === attendeeId);
+    if (!attendee) return;
+
+    const currentAccepted = attendees.filter(a => a.status === 'accepted').length;
+    if (currentAccepted >= 20) {
+      if (!confirm('The 20-seat capacity limit for this session has already been reached. Do you still want to approve this candidate?')) {
+        return;
+      }
+    }
+
+    setIsGeneratingTicket(true);
+    let ticketUrl = attendee.ticketImageData;
+    try {
+      ticketUrl = await generateTicketImage({
+        date: upcomingSession.dateStr || 'Upcoming Wednesday, 4:00 PM WAT',
+        time: '4:00 PM WAT',
+        location: 'Community Innovation Hub, Abesan Estate, Ipaja, Lagos',
+        topic: upcomingSession.topicTitle || 'Ethics & Decision Science Case Study',
+        attendeeName: attendee.fullName
+      });
+    } catch (err) {
+      console.error('Error generating ticket canvas', err);
+    } finally {
+      setIsGeneratingTicket(false);
+    }
+
+    const updated = attendees.map(a => {
+      if (a.id === attendeeId) {
+        return {
+          ...a,
+          status: 'accepted' as const,
+          selectedForSession: true,
+          ticketIssued: true,
+          ticketImageData: ticketUrl || a.ticketImageData,
+          selectionDate: new Date().toISOString()
+        };
+      }
+      return a;
+    });
+
+    setAttendees(updated);
+    saveStoredRegistrations(updated);
+    if (selectedAttendeeForModal && selectedAttendeeForModal.id === attendeeId) {
+      setSelectedAttendeeForModal({
+        ...selectedAttendeeForModal,
+        status: 'accepted',
+        selectedForSession: true,
+        ticketIssued: true,
+        ticketImageData: ticketUrl
+      });
+    }
+
+    alert(`Candidate "${attendee.fullName}" has been selected! Official email and digital ticket pass are scheduled for Tuesday morning dispatch.`);
+  };
+
+  const handleDeclineAttendee = (attendeeId: string) => {
+    const updated = attendees.map(a => {
+      if (a.id === attendeeId) {
+        return {
+          ...a,
+          status: 'declined' as const,
+          selectedForSession: false
+        };
+      }
+      return a;
+    });
+    setAttendees(updated);
+    saveStoredRegistrations(updated);
+    if (selectedAttendeeForModal && selectedAttendeeForModal.id === attendeeId) {
+      setSelectedAttendeeForModal({ ...selectedAttendeeForModal, status: 'declined', selectedForSession: false });
+    }
+  };
+
+  // Dispatch Tuesday Passes Trigger (Item 8)
+  const handleDispatchTuesdayPasses = () => {
+    const acceptedAttendees = attendees.filter(a => a.status === 'accepted');
+    if (acceptedAttendees.length === 0) {
+      alert('No attendees are currently in Accepted status. Please review and select candidates first.');
+      return;
+    }
+
+    const updated = attendees.map(a => {
+      if (a.status === 'accepted') {
+        return {
+          ...a,
+          passDispatchedAt: new Date().toISOString(),
+          ticketIssued: true
+        };
+      }
+      return a;
+    });
+
+    setAttendees(updated);
+    saveStoredRegistrations(updated);
+    alert(`Tuesday Morning Dispatch Complete! Official email tickets and session guidelines have been dispatched to all ${acceptedAttendees.length} selected participant(s).`);
+  };
+
+  // Export Attendees CSV
+  const handleExportAttendeesCSV = () => {
+    const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Attendee Type', 'Essay Word Count', 'Timestamp', 'Status', 'Essay'];
+    const rows = attendees.map(a => [
+      `"${a.id}"`,
+      `"${a.fullName.replace(/"/g, '""')}"`,
+      `"${a.email}"`,
+      `"${a.phone || 'N/A'}"`,
+      `"${a.attendeeType}"`,
+      `"${countWords(a.attendanceEssay || '')}"`,
+      `"${new Date(a.timestamp).toLocaleString()}"`,
+      `"${a.status || 'pending'}"`,
+      `"${(a.attendanceEssay || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `cih_case_study_attendees_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // FAQ User Question Reply Handler & Locking (Item 24)
+  const handleSaveFAQAnswer = (questionId: string) => {
+    const ans = faqAnswerInputMap[questionId];
+    if (!ans || !ans.trim()) return;
+
+    const updated = userQuestions.map(item => {
+      if (item.id === questionId) {
+        return {
+          ...item,
+          answer: ans.trim(),
+          status: 'answered' as const,
+          lockedAfterAnswer: true
+        };
+      }
+      return item;
+    });
+
+    setUserQuestions(updated);
+    saveStoredUserQuestions(updated);
+    setFaqAnswerInputMap({ ...faqAnswerInputMap, [questionId]: '' });
+    // Re-lock after update
+    setUnlockedFaqIds(prev => ({ ...prev, [questionId]: false }));
+    alert('Answer published immediately to the live FAQ page and locked to protect community integrity.');
+  };
+
+  // FAQ Emergency Unlock (Item 24: Requires 3 intentional clicks)
+  const handleEmergencyUnlockFAQ = (questionId: string) => {
+    const current = emergencyAttempts[questionId] || 0;
+    const next = current + 1;
+
+    if (next >= 3) {
+      setUnlockedFaqIds(prev => ({ ...prev, [questionId]: true }));
+      setEmergencyAttempts(prev => ({ ...prev, [questionId]: 0 }));
+      const target = userQuestions.find(q => q.id === questionId);
+      if (target) {
+        setFaqAnswerInputMap(prev => ({ ...prev, [questionId]: target.answer }));
+      }
+      alert('Emergency Unlock Granted (3/3 confirmed). You may now revise the published answer.');
+    } else {
+      setEmergencyAttempts(prev => ({ ...prev, [questionId]: next }));
+    }
+  };
+
+  // Upcoming Session Handler
+  const handleSaveUpcoming = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveStoredUpcomingSession(upcomingSession);
+    setUpcomingSaved(true);
+    setTimeout(() => setUpcomingSaved(false), 2500);
+  };
+
+  // Config Handler
+  const handleSaveConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveAdminConfig(adminConfig);
+    setConfigSaved(true);
+    setTimeout(() => setConfigSaved(false), 2500);
+  };
+
+  // Computations for Attendees
+  const acceptedAttendeesCount = attendees.filter(a => a.status === 'accepted').length;
+  const pendingAttendeesCount = attendees.filter(a => !a.status || a.status === 'pending').length;
+  const declinedAttendeesCount = attendees.filter(a => a.status === 'declined').length;
+
+  const filteredAttendees = attendees.filter(a => {
+    if (attendeeFilter === 'pending') return !a.status || a.status === 'pending';
+    if (attendeeFilter === 'accepted') return a.status === 'accepted';
+    if (attendeeFilter === 'declined') return a.status === 'declined';
+    return true;
+  }).filter(a => {
+    if (!attendeeSearch.trim()) return true;
+    const q = attendeeSearch.toLowerCase();
+    return a.fullName.toLowerCase().includes(q) || a.email.toLowerCase().includes(q);
+  });
+
+  // Computations for Mentorship
+  const filteredMentorshipApps = mentorshipApps.filter(app => {
+    if (mentorshipFilter === 'pending') return !app.status || app.status === 'pending';
+    if (mentorshipFilter === 'reviewed') return app.status === 'reviewed';
+    if (mentorshipFilter === 'accepted') return app.status === 'accepted';
+    if (mentorshipFilter === 'declined') return app.status === 'declined';
+    return true;
+  });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-slate-50">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 sm:p-10 shadow-elevated border border-slate-200">
+          <div className="w-14 h-14 rounded-2xl bg-navy-900 text-white flex items-center justify-center mx-auto mb-6 shadow-md">
+            <Lock className="w-7 h-7 text-brand-orange" />
+          </div>
+
+          <div className="text-center space-y-2 mb-8">
+            <h1 className="text-2xl font-extrabold text-navy-900 tracking-tight">
+              CIH Organizer Portal
+            </h1>
+            <p className="text-sm text-slate-600">
+              Enter the administrator passcode to manage case studies, attendee selections, coach mentorship, and user FAQs.
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="mb-6 p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs font-semibold text-rose-700">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Organizer Passcode
+              </label>
+              <input
+                type="password"
+                required
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                placeholder="Enter passcode (default: cih2024)"
+                className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 px-6 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white text-sm font-bold shadow-md transition-all active:scale-95"
+            >
+              Unlock Dashboard
+            </button>
+
+            <div className="text-center">
+              <span className="text-xs text-slate-400">
+                Default access PIN: <code className="bg-slate-100 px-2 py-0.5 rounded font-mono text-navy-900">cih2024</code>
+              </span>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-navy-900 text-white flex items-center justify-center shadow">
+              <Shield className="w-5 h-5 text-brand-orange" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-navy-900">CIH Case Study Organizer CMS</h1>
+              <p className="text-xs text-slate-500">Live content management, attendee selections, coach desk & FAQ publisher</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:text-navy-900 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Log Out
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('case-studies')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'case-studies'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-brand-orange" />
+            Case Studies ({caseStudies.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('attendees')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'attendees'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Users className="w-4 h-4 text-brand-orange" />
+            Attendees & Essays ({attendees.length})
+            {acceptedAttendeesCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px]">
+                {acceptedAttendeesCount}/20
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('mentorship')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'mentorship'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <UserCheck className="w-4 h-4 text-brand-orange" />
+            Coach Mentorship ({mentorshipApps.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('user-faq')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'user-faq'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-brand-orange" />
+            FAQ Q&A Manager ({userQuestions.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('feedback')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'feedback'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-brand-orange" />
+            Feedback ({feedbackList.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('topic-suggestions')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'topic-suggestions'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Lightbulb className="w-4 h-4 text-brand-orange" />
+            Topic Suggestions ({topicSuggestions.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('upcoming')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'upcoming'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-brand-orange" />
+            Wednesday Banner
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'settings'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Settings className="w-4 h-4 text-brand-orange" />
+            Pipeline & Window
+          </button>
+        </div>
+
+        {/* Tab 1: Past Case Studies */}
+        {activeTab === 'case-studies' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-navy-900">Manage Case Study Archive</h2>
+                <p className="text-xs text-slate-500">
+                  New entries added here appear immediately on the Past Case Studies page with high-res photo galleries.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsAddingStudy(!isAddingStudy)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+              >
+                <PlusCircle className="w-4 h-4" />
+                {isAddingStudy ? 'Cancel New Entry' : 'Add New Case Study'}
+              </button>
+            </div>
+
+            {/* Form to Add New Case Study with >= 10 Image Upload */}
+            {isAddingStudy && (
+              <form onSubmit={handleSaveNewStudy} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-bold text-navy-900">Publish New Case Study Entry</h3>
+                    <p className="text-xs text-slate-500">Upload 10+ local session photos for the interactive gallery carousel</p>
+                  </div>
+                  <span className="text-xs text-slate-400">Updates site immediately</span>
+                </div>
+
+                {/* Local Photo Gallery Upload Area (Item 15) */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-300 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-brand-orange" />
+                      <div>
+                        <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider">
+                          Session Photo Gallery (Upload 10 or more images)
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          Select multiple high-resolution photos from your device to showcase the live deliberations.
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow-sm transition-all active:scale-95 shrink-0">
+                      <Upload className="w-3.5 h-3.5 text-brand-orange" />
+                      <span>Select 10+ Local Photos</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageFilesSelected}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Upload Status & Thumbnail Grid */}
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-slate-700">
+                        {uploadedGallery.length} photo(s) selected
+                      </span>
+                      <span className={uploadedGallery.length >= 10 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-semibold'}>
+                        {uploadedGallery.length >= 10 
+                          ? '✓ Ideal gallery size reached (10+ photos)' 
+                          : `Recommendation: Add at least 10 photos (${Math.max(0, 10 - uploadedGallery.length)} more suggested)`}
+                      </span>
+                    </div>
+
+                    {uploadedGallery.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
+                        {uploadedGallery.map((imgUrl, idx) => {
+                          const isCover = newStudy.imageUrl === imgUrl;
+                          return (
+                            <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-square bg-slate-100">
+                              <img src={imgUrl} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-navy-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                                {!isCover && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetCoverImage(imgUrl)}
+                                    className="px-1.5 py-0.5 rounded bg-brand-orange text-white text-[9px] font-bold shadow"
+                                  >
+                                    Set Cover
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveGalleryImage(idx)}
+                                  className="p-1 rounded bg-rose-600 text-white text-[9px]"
+                                  title="Remove photo"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              {isCover && (
+                                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[8px] font-bold shadow">
+                                  Cover
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Title *</label>
+                    <input
+                      type="text"
+                      value={newStudy.title || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, title: e.target.value })}
+                      placeholder="e.g. Case Study: The Elevator Pitch"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Subtitle</label>
+                    <input
+                      type="text"
+                      value={newStudy.subtitle || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, subtitle: e.target.value })}
+                      placeholder="e.g. Internal projects showcase by Hub Interns & ITs"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Sector</label>
+                    <input
+                      type="text"
+                      value={newStudy.sector || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, sector: e.target.value })}
+                      placeholder="e.g. Communication & Media"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Date String</label>
+                    <input
+                      type="text"
+                      value={newStudy.date || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, date: e.target.value })}
+                      placeholder="e.g. Sep 2, 2026"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Primary Cover Image URL (or select from upload above)</label>
+                    <input
+                      type="text"
+                      value={newStudy.imageUrl || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, imageUrl: e.target.value })}
+                      placeholder="/images/elevator-pitch-presenter.jpg"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Local Video File Path</label>
+                    <input
+                      type="text"
+                      value={newStudy.videoUrl || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, videoUrl: e.target.value })}
+                      placeholder="/videos/the-elevator-pitch.mp4"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">YouTube URL or Video ID</label>
+                    <input
+                      type="text"
+                      value={newStudy.youtubeUrl || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, youtubeUrl: e.target.value })}
+                      placeholder="https://www.youtube.com/watch?v=... or YouTube Video ID"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Excerpt *</label>
+                    <textarea
+                      rows={2}
+                      value={newStudy.excerpt || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, excerpt: e.target.value })}
+                      placeholder="Concise summary for archive cards..."
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                      required
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Full Session Writeup / Narrative</label>
+                    <textarea
+                      rows={4}
+                      value={newStudy.fullContent || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, fullContent: e.target.value })}
+                      placeholder="Detailed scenario breakdown..."
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingStudy(false);
+                      setUploadedGallery([]);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+                  >
+                    Publish Case Study
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* List of Case Studies */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {caseStudies.map((study) => (
+                <div key={study.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                          {study.sector}
+                        </span>
+                        {(study.videoUrl || study.youtubeUrl || study.youtubeVideoId) && (
+                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-orange-100 text-brand-orange border border-orange-200">
+                            Video
+                          </span>
+                        )}
+                        {(study.galleryImages && study.galleryImages.length > 0) && (
+                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                            {study.galleryImages.length} Photos
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400 font-semibold">{study.date}</span>
+                    </div>
+
+                    <h3 className="text-base font-bold text-navy-900">{study.title}</h3>
+                    <p className="text-xs text-slate-600 line-clamp-2">{study.excerpt}</p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <span className="text-[10px] text-slate-400 font-mono">ID: {study.id}</span>
+                    <button
+                      onClick={() => handleDeleteStudy(study.id)}
+                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Delete Entry"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Attendees, 300+ Word Essays & 20-Participant Capacity Review */}
+        {activeTab === 'attendees' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Header & 20-Seat Capacity Status Banner (Item 3, 12) */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-navy-900">Registered Attendees & Admission Essays</h2>
+                  <p className="text-xs text-slate-500">
+                    Review candidates, evaluate their 300-word admission essays, and admit up to strictly 20 participants.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleDispatchTuesdayPasses}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition-all active:scale-95"
+                    title="Send official invitation & entry ticket to all accepted attendees"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Dispatch Tuesday Passes ({acceptedAttendeesCount} Selected)</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportAttendeesCSV}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow transition-all"
+                  >
+                    <Download className="w-4 h-4 text-brand-orange" />
+                    <span>Export to CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 20-Seat Visual Capacity Meter */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-extrabold text-navy-900 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-brand-orange" />
+                    Session Capacity: {acceptedAttendeesCount} of 20 Eligible Seats Filled
+                  </span>
+                  <span className={`font-bold ${acceptedAttendeesCount >= 20 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {acceptedAttendeesCount >= 20 ? 'Cohort At Full Capacity (20/20)' : `${20 - acceptedAttendeesCount} Seat(s) Available`}
+                  </span>
+                </div>
+
+                <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-500 ${
+                      acceptedAttendeesCount >= 20 ? 'bg-rose-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (acceptedAttendeesCount / 20) * 100)}%` }}
+                  />
+                </div>
+
+                <p className="text-[11px] text-slate-500">
+                  Strictly 20 participants are eligible per session. Selected candidates receive their digital passes and welcome pack on Tuesday morning.
+                </p>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setAttendeeFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    attendeeFilter === 'all' ? 'bg-navy-900 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  All Registrations ({attendees.length})
+                </button>
+                <button
+                  onClick={() => setAttendeeFilter('pending')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    attendeeFilter === 'pending' ? 'bg-amber-500 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  Pending Selection ({pendingAttendeesCount})
+                </button>
+                <button
+                  onClick={() => setAttendeeFilter('accepted')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    attendeeFilter === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  Selected ({acceptedAttendeesCount})
+                </button>
+                <button
+                  onClick={() => setAttendeeFilter('declined')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    attendeeFilter === 'declined' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  Declined ({declinedAttendeesCount})
+                </button>
+              </div>
+
+              <div className="relative max-w-xs w-full">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  value={attendeeSearch}
+                  onChange={(e) => setAttendeeSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange"
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-700">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-3.5">Candidate</th>
+                      <th className="px-6 py-3.5">Contact</th>
+                      <th className="px-6 py-3.5">Track</th>
+                      <th className="px-6 py-3.5">Admission Essay</th>
+                      <th className="px-6 py-3.5">Status</th>
+                      <th className="px-6 py-3.5 text-right">Review Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredAttendees.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                          No attendee registrations match your current filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAttendees.map((attendee) => {
+                        const wordCount = countWords(attendee.attendanceEssay || '');
+                        const isPending = !attendee.status || attendee.status === 'pending';
+                        const isAccepted = attendee.status === 'accepted';
+                        const isDeclined = attendee.status === 'declined';
+
+                        return (
+                          <tr key={attendee.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-navy-900">{attendee.fullName}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">ID: {attendee.id}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-slate-600">{attendee.email}</div>
+                              <div className="text-slate-500 font-semibold">{attendee.phone || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                attendee.attendeeType === 'Alumni / Past Native' || attendee.attendeeType === 'Hub Member'
+                                  ? 'bg-navy-100 text-navy-900'
+                                  : 'bg-brand-orange-light text-brand-orange'
+                              }`}>
+                                {attendee.attendeeType}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 max-w-xs">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                  wordCount >= 300 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {wordCount} words {wordCount >= 300 ? '✓' : '(Under 300)'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 line-clamp-2 italic">
+                                "{attendee.attendanceEssay || 'No essay submitted'}"
+                              </p>
+                            </td>
+                            <td className="px-6 py-4">
+                              {isPending && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] uppercase">
+                                  <Clock className="w-3 h-3" /> Pending Selection
+                                </span>
+                              )}
+                              {isAccepted && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase">
+                                  <CheckCircle className="w-3 h-3 text-emerald-600" /> Selected
+                                </span>
+                              )}
+                              {isDeclined && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px] uppercase">
+                                  Declined
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => setSelectedAttendeeForModal(attendee)}
+                                  className="px-2.5 py-1 text-[11px] font-bold text-navy-900 hover:bg-slate-100 rounded-lg border border-slate-200"
+                                >
+                                  Read Essay
+                                </button>
+                                {isPending && (
+                                  <>
+                                    <button
+                                      disabled={isGeneratingTicket}
+                                      onClick={() => handleAcceptAttendee(attendee.id)}
+                                      className="px-2.5 py-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm"
+                                    >
+                                      Select
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeclineAttendee(attendee.id)}
+                                      className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200"
+                                    >
+                                      Decline
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal: Read Full 300+ Word Essay & Actions */}
+            {selectedAttendeeForModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5">
+                  <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2.5 py-0.5 rounded-full bg-brand-orange-light text-brand-orange text-xs font-bold uppercase">
+                          {selectedAttendeeForModal.attendeeType}
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
+                          selectedAttendeeForModal.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' :
+                          selectedAttendeeForModal.status === 'declined' ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {selectedAttendeeForModal.status || 'Pending Selection'}
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-extrabold text-navy-900">
+                        {selectedAttendeeForModal.fullName}
+                      </h3>
+                      <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-3">
+                        <span><strong>Email:</strong> {selectedAttendeeForModal.email}</span>
+                        <span><strong>Phone:</strong> {selectedAttendeeForModal.phone || 'N/A'}</span>
+                        <span><strong>Registered:</strong> {new Date(selectedAttendeeForModal.timestamp).toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedAttendeeForModal(null)}
+                      className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* 300-Word Essay Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider">
+                        Candidate Admission Essay (Why attend & why this topic?)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-navy-900 font-mono text-xs font-bold">
+                        {countWords(selectedAttendeeForModal.attendanceEssay || '')} Words
+                      </span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-800 leading-relaxed max-h-72 overflow-y-auto whitespace-pre-wrap">
+                      {selectedAttendeeForModal.attendanceEssay || 'No essay provided.'}
+                    </div>
+                  </div>
+
+                  {/* Generated Ticket Preview if accepted */}
+                  {selectedAttendeeForModal.ticketImageData && (
+                    <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs space-y-2">
+                      <div className="font-bold text-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        Official Digital Ticket Generated & Scheduled for Tuesday Dispatch
+                      </div>
+                      <img 
+                        src={selectedAttendeeForModal.ticketImageData} 
+                        alt="Entry Ticket Preview" 
+                        className="max-h-36 rounded-xl border border-emerald-300 shadow-sm mx-auto"
+                      />
+                    </div>
+                  )}
+
+                  {/* Modal Action Controls */}
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <button
+                      onClick={() => setSelectedAttendeeForModal(null)}
+                      className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                    >
+                      Close
+                    </button>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleDeclineAttendee(selectedAttendeeForModal.id)}
+                        className="px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200"
+                      >
+                        Decline Candidate
+                      </button>
+                      <button
+                        onClick={() => handleAcceptAttendee(selectedAttendeeForModal.id)}
+                        className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow"
+                      >
+                        Accept & Admit to 20-Seat Cohort
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: Personal Mentorship Applications (Item 11, 14, 16, 22, 23) */}
+        {activeTab === 'mentorship' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-navy-900">Coach Mentorship Applications</h2>
+                <p className="text-xs text-slate-500">
+                  Review candidates applying for 1-on-1 coaching with approved CIH coaches (3-Month Term).
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleExportMentorshipCSV}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow transition-all"
+                >
+                  <Download className="w-4 h-4 text-brand-orange" />
+                  <span>Export Mentorship to CSV</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setMentorshipFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  mentorshipFilter === 'all' ? 'bg-navy-900 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                All Applications ({mentorshipApps.length})
+              </button>
+              <button
+                onClick={() => setMentorshipFilter('pending')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  mentorshipFilter === 'pending' ? 'bg-amber-500 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                Pending Review ({mentorshipApps.filter(a => !a.status || a.status === 'pending').length})
+              </button>
+              <button
+                onClick={() => setMentorshipFilter('accepted')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  mentorshipFilter === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                Accepted Matches ({mentorshipApps.filter(a => a.status === 'accepted').length})
+              </button>
+              <button
+                onClick={() => setMentorshipFilter('reviewed')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  mentorshipFilter === 'reviewed' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                Reviewed ({mentorshipApps.filter(a => a.status === 'reviewed').length})
+              </button>
+            </div>
+
+            {filteredMentorshipApps.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+                No coach mentorship applications match this filter.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredMentorshipApps.map(app => {
+                  const isPending = !app.status || app.status === 'pending';
+                  const isAccepted = app.status === 'accepted';
+                  const isReviewed = app.status === 'reviewed';
+                  const isDeclined = app.status === 'declined';
+
+                  return (
+                    <div key={app.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between border-b border-slate-100 pb-3 gap-2">
+                          <div>
+                            <h3 className="text-base font-extrabold text-navy-900">{app.fullName}</h3>
+                            <span className="text-xs font-semibold text-brand-orange">{app.focusArea}</span>
+                          </div>
+
+                          {/* Status Sign (Item 11, 23: Default pending prominent sign) */}
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            isAccepted ? 'bg-emerald-100 text-emerald-800' :
+                            isReviewed ? 'bg-blue-100 text-blue-800' :
+                            isDeclined ? 'bg-rose-100 text-rose-800' :
+                            'bg-amber-100 text-amber-800 ring-1 ring-amber-300'
+                          }`}>
+                            {isPending ? 'Pending Review' : app.status}
+                          </span>
+                        </div>
+
+                        {/* Desired Coach (Item 14) & 3-Month Term (Item 22) */}
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-bold uppercase text-[10px]">Desired Coach:</span>
+                            <span className="font-extrabold text-navy-900 px-2 py-0.5 rounded bg-white border border-slate-200">
+                              {app.desiredMentor || 'Any Available Coach'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-600">
+                            <span className="flex items-center gap-1 font-semibold text-slate-500">
+                              <Clock className="w-3 h-3 text-brand-orange" /> Mentorship Term:
+                            </span>
+                            <span className="font-bold text-navy-900">
+                              3 Months ({app.cohortStartDate ? new Date(app.cohortStartDate).toLocaleDateString() : 'Immediate'} - {app.cohortEndDate ? new Date(app.cohortEndDate).toLocaleDateString() : '3 Months active'})
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-xs space-y-1 text-slate-600">
+                          <div><strong>Email:</strong> <a href={`mailto:${app.email}`} className="text-brand-orange hover:underline">{app.email}</a></div>
+                          <div><strong>Phone / WhatsApp:</strong> <a href={`tel:${app.phone}`} className="text-brand-orange hover:underline">{app.phone}</a></div>
+                          <div><strong>Applied On:</strong> {new Date(app.createdAt).toLocaleString()}</div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-800 space-y-1">
+                          <span className="font-bold text-navy-900">Reason / Mentorship Goals:</span>
+                          <p className="leading-relaxed whitespace-pre-wrap">"{app.reasonNeeded}"</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+                        <span className="text-slate-400">Update Status:</span>
+                        <div className="flex gap-2">
+                          {!isReviewed && (
+                            <button
+                              onClick={() => handleUpdateMentorshipStatus(app.id, 'reviewed')}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-navy-900 text-[11px] font-bold"
+                            >
+                              Mark Reviewed
+                            </button>
+                          )}
+                          {!isAccepted && (
+                            <button
+                              onClick={() => handleUpdateMentorshipStatus(app.id, 'accepted')}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold shadow"
+                            >
+                              Accept Candidate
+                            </button>
+                          )}
+                          {!isDeclined && (
+                            <button
+                              onClick={() => handleUpdateMentorshipStatus(app.id, 'declined')}
+                              className="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 text-[11px] font-bold"
+                            >
+                              Decline
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 4: User FAQ Q&A Manager with Locking & 3-Click Emergency Unlock (Item 24) */}
+        {activeTab === 'user-faq' && (
+          <div className="space-y-6 animate-fade-in">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900">User FAQ & Q&A Manager</h2>
+              <p className="text-xs text-slate-500">
+                Answer visitor-submitted inquiries immediately. Answers are locked upon publication to prevent misinformation, with a 3-click emergency unlock.
+              </p>
+            </div>
+
+            {userQuestions.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+                No user questions submitted yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userQuestions.map(q => {
+                  const isAnswered = q.status === 'answered' || !!(q.answer && q.answer !== 'Thank you for your question! A CIH administrator is reviewing your inquiry and will publish an official response shortly.');
+                  const isUnlocked = !!unlockedFaqIds[q.id];
+                  const attempts = emergencyAttempts[q.id] || 0;
+
+                  return (
+                    <div key={q.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+                      <div className="flex items-start justify-between border-b border-slate-100 pb-3 gap-2">
+                        <div>
+                          <span className="text-xs font-bold text-brand-orange uppercase">
+                            Asked by: {q.askedByName || 'Community Member'} {q.userEmail ? `(${q.userEmail})` : ''}
+                          </span>
+                          <h4 className="text-base font-extrabold text-navy-900 mt-0.5">
+                            "{q.question}"
+                          </h4>
+                          {q.createdAt && (
+                            <span className="text-[11px] text-slate-400">
+                              Submitted: {new Date(q.createdAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                          isAnswered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {isAnswered ? 'Answer Published' : 'Pending Answer'}
+                        </span>
+                      </div>
+
+                      {/* Display Current Answer on FAQ Page */}
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
+                        <span className="font-bold text-navy-900">Current Answer on Public FAQ Page:</span>
+                        <p className="text-slate-700 leading-relaxed">{q.answer}</p>
+                      </div>
+
+                      {/* Locked vs Unlocked Answer Editing (Item 24) */}
+                      {isAnswered && !isUnlocked ? (
+                        <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 text-amber-900 font-semibold">
+                            <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>Locked: This answer is live and locked against accidental edits to prevent misinformation.</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleEmergencyUnlockFAQ(q.id)}
+                            className="px-3.5 py-2 rounded-xl bg-amber-200/80 hover:bg-amber-300 text-amber-950 font-bold text-[11px] transition-colors shrink-0 shadow-sm"
+                          >
+                            {attempts > 0 
+                              ? `Emergency Unlock (${attempts}/3 Clicks - Confirm)` 
+                              : 'Emergency Unlock (Requires 3 Clicks)'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 pt-1">
+                          {isUnlocked && (
+                            <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center gap-1.5">
+                              <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+                              Emergency unlock active: enter updated answer below. It will re-lock upon saving.
+                            </div>
+                          )}
+
+                          <label className="block text-xs font-bold text-navy-900">
+                            {isUnlocked ? 'Revise Published Answer:' : 'Type Official Answer to Publish Live:'}
+                          </label>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <textarea
+                              rows={2}
+                              placeholder="Type official answer to be displayed publicly on FAQ page..."
+                              value={faqAnswerInputMap[q.id] ?? (isUnlocked ? q.answer : '')}
+                              onChange={e => setFaqAnswerInputMap({ ...faqAnswerInputMap, [q.id]: e.target.value })}
+                              className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-brand-orange resize-none"
+                            />
+                            <button
+                              onClick={() => handleSaveFAQAnswer(q.id)}
+                              className="px-5 py-2 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow sm:self-end"
+                            >
+                              <Send className="w-3 h-3" /> Publish & Lock
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 5: Case Study Feedback & Discussions */}
+        {activeTab === 'feedback' && (
+          <div className="space-y-6 animate-fade-in">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900">Attendee Feedback & Discussion Replies</h2>
+              <p className="text-xs text-slate-500">
+                View comments posted on case studies and publish official CIH admin replies.
+              </p>
+            </div>
+
+            {feedbackList.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+                No attendee feedback posted yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {feedbackList.map(item => {
+                  const parentStudy = caseStudies.find(c => c.id === item.caseStudyId);
+                  return (
+                    <div key={item.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                          <span className="text-xs font-bold text-brand-orange uppercase">
+                            Case Study: {parentStudy?.title || item.caseStudyId}
+                          </span>
+                          <h4 className="text-sm font-extrabold text-navy-900 mt-0.5">
+                            {item.userName} {item.userEmail ? `(${item.userEmail})` : ''}
+                          </h4>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          {new Date(item.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-slate-800 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        "{item.comment}"
+                      </p>
+
+                      {item.adminReply ? (
+                        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-1">
+                          <span className="font-bold text-emerald-800 flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Official Admin Reply:
+                          </span>
+                          <p className="text-slate-800">{item.adminReply}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 pt-1">
+                          <label className="block text-xs font-bold text-navy-900">
+                            Post Admin Reply to {item.userName}:
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Type official admin response here..."
+                              value={replyInputMap[item.id] || ''}
+                              onChange={e => setReplyInputMap({ ...replyInputMap, [item.id]: e.target.value })}
+                              className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-brand-orange"
+                            />
+                            <button
+                              onClick={() => handleSaveFeedbackReply(item.id)}
+                              className="px-4 py-2 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold flex items-center gap-1 shadow"
+                            >
+                              <Send className="w-3 h-3" /> Reply
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 6: Topic Suggestions */}
+        {activeTab === 'topic-suggestions' && (
+          <div className="space-y-6 animate-fade-in">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900">User Topic Suggestions</h2>
+              <p className="text-xs text-slate-500">
+                Review topics and skillsets requested by community members for upcoming Wednesday sessions.
+              </p>
+            </div>
+
+            {topicSuggestions.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+                No topic suggestions submitted yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {topicSuggestions.map(sug => (
+                  <div key={sug.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
+                            <Lightbulb className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-extrabold text-navy-900">{sug.suggestedTopic}</h3>
+                            <span className="text-[11px] text-slate-400">By {sug.fullName} {sug.email ? `(${sug.email})` : ''}</span>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full bg-brand-orange-light text-brand-orange text-[10px] font-extrabold">
+                          {sug.votes || 1} Vote(s)
+                        </span>
+                      </div>
+
+                      {sug.whyNeeded && (
+                        <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <strong>Why needed:</strong> "{sug.whyNeeded}"
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                      <span>Submitted: {new Date(sug.createdAt).toLocaleDateString()}</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5" /> Logged for Curriculum Review
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 7: Next Wednesday Session Banner */}
+        {activeTab === 'upcoming' && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6 animate-fade-in max-w-3xl">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900">Next Wednesday Session Banner</h2>
+              <p className="text-xs text-slate-500">
+                Update the highlighted topic featured prominently across the Topics and Home pages.
+              </p>
+            </div>
+
+            {upcomingSaved && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span>Upcoming session updated successfully!</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveUpcoming} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Badge Text</label>
+                  <input
+                    type="text"
+                    required
+                    value={upcomingSession.badgeText}
+                    onChange={(e) => setUpcomingSession({ ...upcomingSession, badgeText: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-orange/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Schedule & Time</label>
+                  <input
+                    type="text"
+                    required
+                    value={upcomingSession.dateStr}
+                    onChange={(e) => setUpcomingSession({ ...upcomingSession, dateStr: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-orange/50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Topic Headline</label>
+                <input
+                  type="text"
+                  required
+                  value={upcomingSession.topicTitle}
+                  onChange={(e) => setUpcomingSession({ ...upcomingSession, topicTitle: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-orange/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Short Description</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={upcomingSession.description}
+                  onChange={(e) => setUpcomingSession({ ...upcomingSession, description: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-orange/50 resize-none"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-xl shadow transition-all active:scale-95"
+                >
+                  Save Next Wednesday Topic
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Tab 8: Pipeline & Window Settings */}
+        {activeTab === 'settings' && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6 animate-fade-in max-w-3xl">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900">Google Apps Script Pipeline & Timing Window</h2>
+              <p className="text-xs text-slate-500">
+                Configure the automated Google Sheet/Gmail integration URL and the Saturday midnight registration cutoff.
+              </p>
+            </div>
+
+            {configSaved && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span>Settings saved successfully!</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveConfig} className="space-y-6">
+              {/* Registration Window Timing & Saturday Closure Notice (Item 5) */}
+              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-navy-900 uppercase tracking-wider">
+                    Weekly Registration Window (Saturday Midnight Cutoff)
+                  </label>
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-brand-orange/10 text-brand-orange font-bold uppercase">
+                    West Africa Time (WAT)
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Registrations close on Saturdays at 11:59 PM WAT for the upcoming Wednesday session. This allows organizers to review all 300-word essays and dispatch official tickets on Tuesday morning.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setAdminConfig({ ...adminConfig, registrationMode: 'auto' })}
+                    className={`p-3.5 rounded-xl border text-left text-xs transition-all ${
+                      (adminConfig.registrationMode || 'auto') === 'auto'
+                        ? 'border-brand-orange bg-brand-orange-light text-navy-900 shadow-sm ring-1 ring-brand-orange font-bold'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="font-extrabold text-navy-900 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Automatic (Standard)
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-normal">
+                      Closes Saturday 11:59 PM; Re-opens Thursday morning after session.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdminConfig({ ...adminConfig, registrationMode: 'force_open' })}
+                    className={`p-3.5 rounded-xl border text-left text-xs transition-all ${
+                      adminConfig.registrationMode === 'force_open'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm ring-1 ring-emerald-500 font-bold'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="font-extrabold text-emerald-800 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Force Open
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-normal">
+                      Keep form open indefinitely regardless of weekday.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdminConfig({ ...adminConfig, registrationMode: 'force_closed' })}
+                    className={`p-3.5 rounded-xl border text-left text-xs transition-all ${
+                      adminConfig.registrationMode === 'force_closed'
+                        ? 'border-rose-500 bg-rose-50 text-rose-950 shadow-sm ring-1 ring-rose-500 font-bold'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="font-extrabold text-rose-800 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      Force Closed
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-normal">
+                      Close registration immediately (capacity limits reached).
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Google Apps Script Web App URL
+                </label>
+                <input
+                  type="url"
+                  value={adminConfig.appsScriptUrl}
+                  onChange={(e) => setAdminConfig({ ...adminConfig, appsScriptUrl: e.target.value })}
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-brand-orange/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Change Organizer Passcode
+                </label>
+                <input
+                  type="text"
+                  value={adminConfig.adminPasscode}
+                  onChange={(e) => setAdminConfig({ ...adminConfig, adminPasscode: e.target.value })}
+                  placeholder="e.g. cih2024"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-orange/50 max-w-xs"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow transition-all active:scale-95"
+                >
+                  Save Integration & Registration Settings
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

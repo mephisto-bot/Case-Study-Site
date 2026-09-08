@@ -1,0 +1,9 @@
+# Vercel Ignore file
+node_modules
+dist
+Html → Body*.png
+*.png
+!public/**
+CIH Entry Ticket
+CIH Team member pics
+case study images
