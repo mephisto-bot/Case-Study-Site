@@ -204,3 +204,28 @@ export interface RememberedAccount {
   lastUsedAt: string;
 }
 
+export type EmailCategory = 
+  | 'session_registration_confirmed'
+  | 'session_accepted'
+  | 'session_declined'
+  | 'mentorship_submitted'
+  | 'mentorship_accepted'
+  | 'mentorship_declined'
+  | 'coach_submitted'
+  | 'coach_approved'
+  | 'coach_declined';
+
+export interface SentEmailLog {
+  id: string;
+  recipientEmail: string;
+  recipientName: string;
+  category: EmailCategory;
+  subject: string;
+  htmlBody: string;
+  plainText: string;
+  sentAt: string;
+  status: 'sent' | 'queued' | 'simulated';
+  applicationId?: string;
+  meta?: Record<string, any>;
+}
+

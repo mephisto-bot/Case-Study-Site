@@ -1,8 +1,9 @@
 import { RegistrationFormData, AttendeeRecord } from '../types';
-import { getAdminConfig, getStoredRegistrations, saveStoredRegistrations } from './storage';
+import { getAdminConfig, getStoredRegistrations, saveStoredRegistrations, getStoredUpcomingSession } from './storage';
 import { getRegistrationStatus } from '../utils/registrationTiming';
 import { getNextSessionTargetDate } from '../utils/dateHelpers';
 import { insertRegistrationToSupabase } from './supabase';
+import { sendSessionRegistrationReceivedEmail } from './emailService';
 
 export interface RegistrationResponse {
   success: boolean;
@@ -90,6 +91,14 @@ export const submitRegistration = async (data: RegistrationFormData): Promise<Re
     saveStoredRegistrations([newRecord, ...existing]);
   } catch (err) {
     console.error('Error saving registration locally', err);
+  }
+
+  // 3. Instant Confirmation Email to Applicant
+  try {
+    const upcoming = getStoredUpcomingSession();
+    await sendSessionRegistrationReceivedEmail(newRecord, upcoming);
+  } catch (mailErr) {
+    console.warn('Instant registration confirmation email notice:', mailErr);
   }
 
   return {

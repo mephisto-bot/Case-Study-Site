@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getStoredRegistrations } from '../services/storage';
+import {
+  getStoredRegistrations,
+  getStoredMentorshipApplications,
+  getStoredAlumniCoachApplications,
+  getStoredSentEmails
+} from '../services/storage';
+import { getGmailDirectUrl } from '../services/emailService';
+import { SentEmailLog, AttendeeRecord, MentorshipApplication, AlumniCoachApplication } from '../types';
 import { getNextSessionTargetDate } from '../utils/dateHelpers';
 import {
   User,
@@ -18,7 +25,14 @@ import {
   Ticket,
   ArrowLeft,
   ArrowRight,
-  X
+  X,
+  Clock,
+  XCircle,
+  FileText,
+  ExternalLink,
+  ShieldCheck,
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
@@ -63,16 +77,34 @@ export const ProfilePage: React.FC = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [selectedLetter, setSelectedLetter] = useState<SentEmailLog | null>(null);
 
   // Form states - Name and phone are permanent credentials and cannot be edited
   const [bio, setBio] = useState(user.bio || '');
   const [alumniCohort, setAlumniCohort] = useState(user.alumniCohort || '');
   const [isMentorVolunteer, setIsMentorVolunteer] = useState(user.isMentorVolunteer || false);
 
-  // Check upcoming session registration
+  // Check upcoming session registration and applications
+  const userEmail = (user.email || '').toLowerCase().trim();
   const allRegistrations = getStoredRegistrations();
-  const userRegistration = allRegistrations.find(
-    (r) => r.email.toLowerCase().trim() === user.email.toLowerCase().trim()
+  const userRegistrations = allRegistrations.filter(
+    (r) => (r.email || '').toLowerCase().trim() === userEmail
+  );
+  const userRegistration = userRegistrations[0];
+
+  const allMentorshipApps = getStoredMentorshipApplications();
+  const userMentorshipApps = allMentorshipApps.filter(
+    (a) => (a.email || '').toLowerCase().trim() === userEmail
+  );
+
+  const allCoachApps = getStoredAlumniCoachApplications();
+  const userCoachApps = allCoachApps.filter(
+    (c) => (c.email || '').toLowerCase().trim() === userEmail
+  );
+
+  const allSentEmails = getStoredSentEmails();
+  const userLetters = allSentEmails.filter(
+    (e) => (e.recipientEmail || '').toLowerCase().trim() === userEmail
   );
 
   const nextSessionDate = getNextSessionTargetDate();
@@ -311,23 +343,32 @@ export const ProfilePage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-navy-900">
-                    {userRegistration ? 'Seat Confirmed' : 'Upcoming Session'}
+                    {userRegistration ? (userRegistration.status === 'accepted' ? 'Seat Accepted & Confirmed' : userRegistration.status === 'declined' ? 'Session Registration Declined' : 'Registration Pending Review') : 'Wednesday Case Study'}
                   </span>
                   <span className="text-[10px] text-slate-400 font-semibold">• {formattedDate}</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Wednesdays 10:00 AM – 4:00 PM • CIH Hub, Ipaja
+                  Wednesdays 10:00 AM – 1:00 PM • CIH Hub, Ipaja
                 </p>
               </div>
             </div>
 
             {userRegistration ? (
-              <Link
-                to="/register"
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shrink-0 shadow-xs"
-              >
-                View Pass
-              </Link>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider ${
+                  userRegistration.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' :
+                  userRegistration.status === 'declined' ? 'bg-rose-100 text-rose-800' :
+                  'bg-amber-100 text-amber-800'
+                }`}>
+                  {userRegistration.status}
+                </span>
+                <Link
+                  to="/register"
+                  className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold transition-colors shrink-0 shadow-xs"
+                >
+                  View Details
+                </Link>
+              </div>
             ) : (
               <Link
                 to="/register"
@@ -338,6 +379,254 @@ export const ProfilePage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* ================= ALL APPLICATIONS & TRACKING ================= */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-brand-orange" />
+              <h3 className="text-xs font-extrabold text-navy-900 uppercase tracking-wider">
+                My Applications & Review Status
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {userRegistrations.length + userMentorshipApps.length + userCoachApps.length} active application(s)
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {/* Wednesday Session Application */}
+            {userRegistrations.map((reg) => (
+              <div key={reg.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-navy-900">Wednesday Case Study Seat</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                      reg.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' :
+                      reg.status === 'declined' ? 'bg-rose-100 text-rose-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {reg.status === 'accepted' ? 'Accepted & Pass Granted' : reg.status === 'declined' ? 'Declined / Session Full' : 'Pending CIH Review'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                    Attendee: {reg.attendeeType} • Applied on {new Date(reg.timestamp).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {/* Mentorship Applications */}
+            {userMentorshipApps.map((app) => (
+              <div key={app.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-navy-900">1-on-1 Mentorship</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                      app.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' :
+                      app.status === 'declined' ? 'bg-rose-100 text-rose-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {app.status === 'accepted' ? 'Accepted by Coach' : app.status === 'declined' ? 'Application Declined' : 'Under Coach Review'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Coach: <span className="font-semibold text-navy-900">{app.desiredMentor}</span> • Focus: {app.focusArea}
+                  </p>
+                </div>
+                <Link
+                  to="/mentorship"
+                  className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-[11px] font-bold text-navy-900 shrink-0"
+                >
+                  View
+                </Link>
+              </div>
+            ))}
+
+            {/* Coach Applications */}
+            {userCoachApps.map((app) => (
+              <div key={app.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-navy-900">CIH Coach Volunteer</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                      app.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' :
+                      app.status === 'declined' ? 'bg-rose-100 text-rose-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {app.status === 'accepted' ? 'Approved Coach' : app.status === 'declined' ? 'Declined by CIH' : 'Under Management Review'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Track: {app.alumniTrack} • Domain: {app.coachingDomain}
+                  </p>
+                </div>
+                <Link
+                  to="/mentorship"
+                  className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-[11px] font-bold text-navy-900 shrink-0"
+                >
+                  Dashboard
+                </Link>
+              </div>
+            ))}
+
+            {userRegistrations.length === 0 && userMentorshipApps.length === 0 && userCoachApps.length === 0 && (
+              <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-600">No active applications found</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Register for Wednesday Case Study or apply for 1-on-1 mentorship.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ================= OFFICIAL NOTIFICATION LETTERS & EMAILS ================= */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-brand-orange" />
+              <h3 className="text-xs font-extrabold text-navy-900 uppercase tracking-wider">
+                Official Review Letters & Email Notifications
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {userLetters.length} letter(s) received
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Official decision letters dispatched directly to your email inbox ({user.email}). You can view the full official letter below at any time.
+          </p>
+
+          <div className="space-y-2">
+            {userLetters.length > 0 ? (
+              userLetters.map((letter) => (
+                <div
+                  key={letter.id}
+                  className="p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/70 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                        letter.category.includes('accepted') || letter.category.includes('approved')
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : letter.category.includes('declined')
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : 'bg-blue-100 text-blue-800 border border-blue-200'
+                      }`}>
+                        {letter.category.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
+                        <Clock className="w-3 h-3" />
+                        {new Date(letter.sentAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="font-bold text-navy-900 line-clamp-1">{letter.subject}</p>
+                    <p className="text-[11px] text-slate-500 line-clamp-1">{letter.plainText}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setSelectedLetter(letter)}
+                      className="px-3 py-1.5 rounded-lg bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Read Letter</span>
+                    </button>
+                    <a
+                      href={getGmailDirectUrl(letter.recipientEmail, letter.subject, letter.plainText)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open in Gmail"
+                      className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                <Mail className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-600">No review emails recorded yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  When CIH Management or your mentor reviews your application, your instant decision email will appear here.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ================= LETTER VIEWER MODAL ================= */}
+        {selectedLetter && (
+          <div className="fixed inset-0 z-50 bg-navy-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 bg-navy-950 text-white flex items-center justify-between border-b border-navy-800">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-brand-orange text-white text-[10px] font-extrabold uppercase tracking-wider">
+                      Official CIH Dispatch
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {new Date(selectedLetter.sentAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-bold text-white mt-1 truncate">
+                    {selectedLetter.subject}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedLetter(null)}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Meta Bar */}
+              <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 text-xs flex flex-wrap items-center justify-between gap-2 text-slate-600">
+                <div>
+                  <span className="font-semibold text-slate-400">To: </span>
+                  <span className="font-bold text-navy-900">{selectedLetter.recipientName}</span> ({selectedLetter.recipientEmail})
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800">
+                    Dispatched & Logged
+                  </span>
+                </div>
+              </div>
+
+              {/* Rendered HTML Letter Content */}
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-100">
+                <div
+                  className="bg-white rounded-xl shadow-xs border border-slate-200 p-3 sm:p-4 overflow-x-auto"
+                  dangerouslySetInnerHTML={{ __html: selectedLetter.htmlBody }}
+                />
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-between gap-3">
+                <a
+                  href={getGmailDirectUrl(selectedLetter.recipientEmail, selectedLetter.subject, selectedLetter.plainText)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open in Gmail</span>
+                </a>
+                <button
+                  onClick={() => setSelectedLetter(null)}
+                  className="px-4 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold transition-colors"
+                >
+                  Close Letter
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

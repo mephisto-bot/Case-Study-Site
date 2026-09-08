@@ -41,6 +41,12 @@ import { MentorshipApplication, AlumniCoachApplication } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { isValidGmail, GMAIL_ERROR_MESSAGE } from '../utils/validation';
 import { COACH_IMAGES, getCoachImage } from '../data/coachImages';
+import { 
+  sendMenteeApplicationReceivedEmail, 
+  sendMenteeAcceptedEmail, 
+  sendMenteeDeclinedEmail, 
+  sendCoachApplicationReceivedEmail 
+} from '../services/emailService';
 
 export interface CoachProfile {
   id: string;
@@ -252,11 +258,22 @@ export const MentorshipPage: React.FC = () => {
     });
     setMentorshipList(updated);
     saveStoredMentorshipApplications(updated);
+
+    // Instant notification email to mentee applicant
+    const target = mentorshipList.find((app) => app.id === appId);
+    if (target) {
+      if (newStatus === 'accepted') {
+        sendMenteeAcceptedEmail(target, activeCoachName);
+      } else if (newStatus === 'declined') {
+        sendMenteeDeclinedEmail(target, activeCoachName);
+      }
+    }
+
     setStatusFeedback(
       newStatus === 'accepted' 
-        ? `Mentee accepted! Assigned to Coach ${activeCoachName} for the 3-Month Term.`
+        ? `Mentee accepted! Instant approval email dispatched and assigned to Coach ${activeCoachName}.`
         : newStatus === 'declined'
-        ? `Application declined.`
+        ? `Application declined. Notification email dispatched to mentee.`
         : `Application reset to pending review.`
     );
     setTimeout(() => setStatusFeedback(null), 4000);
@@ -330,6 +347,13 @@ export const MentorshipPage: React.FC = () => {
       }
     }
 
+    // Send instant confirmation email to applicant
+    try {
+      await sendMenteeApplicationReceivedEmail(newApp);
+    } catch (mailErr) {
+      console.warn('Mentee confirmation email notice:', mailErr);
+    }
+
     setLoading(false);
     setSubmitted(true);
   };
@@ -389,6 +413,13 @@ export const MentorshipPage: React.FC = () => {
       } catch (err) {
         console.error('Apps Script dispatch notice:', err);
       }
+    }
+
+    // Send instant confirmation email to alumni coach applicant
+    try {
+      await sendCoachApplicationReceivedEmail(newApp);
+    } catch (mailErr) {
+      console.warn('Coach confirmation email notice:', mailErr);
     }
 
     setAlumniLoading(false);

@@ -1,4 +1,4 @@
-import { CaseStudy, UpcomingSession, AttendeeRecord, CaseStudyFeedback, MentorshipApplication, AlumniCoachApplication, FAQItem, TopicSuggestion, AdminConfig, Testimonial, AuthUser, RememberedAccount } from '../types';
+import { CaseStudy, UpcomingSession, AttendeeRecord, CaseStudyFeedback, MentorshipApplication, AlumniCoachApplication, FAQItem, TopicSuggestion, AdminConfig, Testimonial, AuthUser, RememberedAccount, SentEmailLog } from '../types';
 import { initialCaseStudies, initialUpcomingSession, initialTestimonials } from '../data/initialData';
 
 const CASE_STUDIES_KEY = 'cih_case_studies_v2';
@@ -15,6 +15,7 @@ const AUTH_USER_KEY = 'cih_auth_user_v1';
 const USERS_STORE_KEY = 'cih_users_v1';
 const REMEMBERED_ACCOUNTS_KEY = 'cih_remembered_accounts_v1';
 const LAST_LOGIN_EMAIL_KEY = 'cih_last_login_email_v1';
+const SENT_EMAILS_KEY = 'cih_sent_emails_v1';
 
 export type { AdminConfig };
 
@@ -624,6 +625,39 @@ export const setLastLoginEmail = (email: string): void => {
     localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim().toLowerCase());
   } catch {
     // Ignore error
+  }
+};
+
+// ==========================================
+// Sent Email Logs Storage (Item 25: Instant notification emails)
+// ==========================================
+export const getStoredSentEmails = (): SentEmailLog[] => {
+  try {
+    const saved = localStorage.getItem(SENT_EMAILS_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (err) {
+    console.error('Error loading sent emails log', err);
+  }
+  return [];
+};
+
+export const saveStoredSentEmails = (emails: SentEmailLog[]): void => {
+  try {
+    localStorage.setItem(SENT_EMAILS_KEY, JSON.stringify(emails));
+  } catch (err) {
+    console.error('Error saving sent emails log', err);
+  }
+};
+
+export const addStoredSentEmail = (email: SentEmailLog): void => {
+  try {
+    const current = getStoredSentEmails();
+    const updated = [email, ...current].slice(0, 300);
+    saveStoredSentEmails(updated);
+  } catch (err) {
+    console.error('Error adding sent email', err);
   }
 };
 

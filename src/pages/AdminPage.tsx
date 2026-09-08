@@ -34,7 +34,8 @@ import {
   Award,
   ExternalLink,
   GraduationCap,
-  Briefcase
+  Briefcase,
+  RefreshCw
 } from 'lucide-react';
 import { 
   getStoredCaseStudies, 
@@ -58,7 +59,8 @@ import {
   getStoredUsers,
   saveStoredUsers,
   getStoredAuthUser,
-  saveStoredAuthUser
+  saveStoredAuthUser,
+  getStoredSentEmails
 } from '../services/storage';
 import { 
   CaseStudy, 
@@ -68,10 +70,19 @@ import {
   MentorshipApplication, 
   AlumniCoachApplication,
   FAQItem, 
-  TopicSuggestion 
+  TopicSuggestion,
+  SentEmailLog
 } from '../types';
 import { generateTicketImage } from '../utils/ticketGenerator';
 import { countWords } from '../utils/validation';
+import { 
+  sendSessionAcceptedEmail, 
+  sendSessionDeclinedEmail, 
+  sendMenteeAcceptedEmail, 
+  sendMenteeDeclinedEmail, 
+  sendCoachApprovedEmail, 
+  sendCoachDeclinedEmail 
+} from '../services/emailService';
 
 export const AdminPage: React.FC = () => {
   const [passcode, setPasscode] = useState('');
@@ -79,7 +90,7 @@ export const AdminPage: React.FC = () => {
   const [loginError, setLoginError] = useState('');
 
   const [activeTab, setActiveTab] = useState<
-    'case-studies' | 'upcoming' | 'attendees' | 'feedback' | 'mentorship' | 'user-faq' | 'topic-suggestions' | 'settings'
+    'case-studies' | 'upcoming' | 'attendees' | 'feedback' | 'mentorship' | 'user-faq' | 'topic-suggestions' | 'email-outbox' | 'settings'
   >('case-studies');
 
   // Case Studies State
@@ -139,6 +150,12 @@ export const AdminPage: React.FC = () => {
   const [adminConfig, setAdminConfig] = useState(getAdminConfig());
   const [configSaved, setConfigSaved] = useState(false);
 
+  // Email Outbox & Audit Logs State
+  const [sentEmails, setSentEmails] = useState<SentEmailLog[]>([]);
+  const [selectedEmailForPreview, setSelectedEmailForPreview] = useState<SentEmailLog | null>(null);
+  const [emailFilter, setEmailFilter] = useState<'all' | 'session' | 'mentorship' | 'coach'>('all');
+  const [emailSearchQuery, setEmailSearchQuery] = useState('');
+
   useEffect(() => {
     const sessionAuth = sessionStorage.getItem('cih_admin_auth');
     if (sessionAuth === 'true') {
@@ -153,6 +170,7 @@ export const AdminPage: React.FC = () => {
     setUserQuestions(getStoredUserQuestions());
     setTopicSuggestions(getStoredTopicSuggestions());
     setAdminConfig(getAdminConfig());
+    setSentEmails(getStoredSentEmails());
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -309,6 +327,17 @@ export const AdminPage: React.FC = () => {
     if (selectedMentorshipAppForModal && selectedMentorshipAppForModal.id === appId) {
       setSelectedMentorshipAppForModal({ ...selectedMentorshipAppForModal, status });
     }
+
+    // Instant notification email to mentee applicant
+    const target = mentorshipApps.find(item => item.id === appId);
+    if (target) {
+      if (status === 'accepted') {
+        sendMenteeAcceptedEmail(target, target.desiredMentor);
+      } else if (status === 'declined') {
+        sendMenteeDeclinedEmail(target, target.desiredMentor);
+      }
+      setTimeout(() => setSentEmails(getStoredSentEmails()), 200);
+    }
   };
 
   // Export Mentorship to CSV (Item 14)
@@ -447,6 +476,17 @@ export const AdminPage: React.FC = () => {
         }
       }
     }
+
+    // Instant notification email to coach applicant
+    const targetApp = alumniCoachApps.find(a => a.id === appId);
+    if (targetApp) {
+      if (newStatus === 'accepted') {
+        sendCoachApprovedEmail(targetApp);
+      } else if (newStatus === 'declined') {
+        sendCoachDeclinedEmail(targetApp);
+      }
+      setTimeout(() => setSentEmails(getStoredSentEmails()), 200);
+    }
   };
 
   // Attendee Selection & Acceptance Handler (Item 4, 8, 12: Generates ticket, schedules Tuesday dispatch)
@@ -503,10 +543,18 @@ export const AdminPage: React.FC = () => {
       });
     }
 
-    alert(`Candidate "${attendee.fullName}" has been selected! Official email and digital ticket pass are scheduled for Tuesday morning dispatch.`);
+    // Instant Email Dispatch for Candidate Acceptance
+    try {
+      await sendSessionAcceptedEmail(attendee, upcomingSession);
+      setTimeout(() => setSentEmails(getStoredSentEmails()), 200);
+    } catch (mailErr) {
+      console.warn('Session acceptance email notice:', mailErr);
+    }
+
+    alert(`Candidate "${attendee.fullName}" has been ACCEPTED! Official admission email & pass dispatched to ${attendee.email}.`);
   };
 
-  const handleDeclineAttendee = (attendeeId: string) => {
+  const handleDeclineAttendee = async (attendeeId: string) => {
     const updated = attendees.map(a => {
       if (a.id === attendeeId) {
         return {
@@ -522,6 +570,19 @@ export const AdminPage: React.FC = () => {
     if (selectedAttendeeForModal && selectedAttendeeForModal.id === attendeeId) {
       setSelectedAttendeeForModal({ ...selectedAttendeeForModal, status: 'declined', selectedForSession: false });
     }
+
+    // Instant Email Dispatch for Candidate Decline
+    const target = attendees.find(a => a.id === attendeeId);
+    if (target) {
+      try {
+        await sendSessionDeclinedEmail(target, upcomingSession);
+        setTimeout(() => setSentEmails(getStoredSentEmails()), 200);
+      } catch (mailErr) {
+        console.warn('Session decline email notice:', mailErr);
+      }
+    }
+
+    alert(`Candidate application marked as DECLINED. Instant notification email dispatched to ${target?.email || 'applicant'}.`);
   };
 
   // Dispatch Tuesday Passes Trigger (Item 8)
@@ -840,6 +901,18 @@ export const AdminPage: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('email-outbox')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'email-outbox'
+                ? 'bg-navy-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Mail className="w-4 h-4 text-brand-orange" />
+            Email Outbox &amp; Logs ({sentEmails.length})
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'settings'
@@ -848,7 +921,7 @@ export const AdminPage: React.FC = () => {
             }`}
           >
             <Settings className="w-4 h-4 text-brand-orange" />
-            Pipeline & Window
+            Pipeline &amp; Window
           </button>
         </div>
 
@@ -2297,6 +2370,286 @@ export const AdminPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* Tab 9: Automated Email Dispatch Outbox & Audit Logs */}
+        {activeTab === 'email-outbox' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-navy-900 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-brand-orange" />
+                  <span>Automated Email Dispatch Outbox &amp; Audit Logs</span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-navy-900 text-white">
+                    {sentEmails.length} Dispatched
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Every candidate who applies, gets accepted, or gets declined across the platform receives an instant automated email. Review all outgoing email deliveries below.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSentEmails(getStoredSentEmails())}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Refresh Outbox</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Outbox KPI Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Dispatched</span>
+                <span className="text-xl font-extrabold text-navy-900">{sentEmails.length}</span>
+              </div>
+              <div className="p-4 rounded-2xl bg-white border border-emerald-200 shadow-xs">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Session Admissions</span>
+                <span className="text-xl font-extrabold text-emerald-700">
+                  {sentEmails.filter(e => e.category === 'session_accepted').length}
+                </span>
+              </div>
+              <div className="p-4 rounded-2xl bg-white border border-blue-200 shadow-xs">
+                <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">Mentorship Approved</span>
+                <span className="text-xl font-extrabold text-blue-700">
+                  {sentEmails.filter(e => e.category === 'mentorship_accepted').length}
+                </span>
+              </div>
+              <div className="p-4 rounded-2xl bg-white border border-purple-200 shadow-xs">
+                <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block">Coach Appointed</span>
+                <span className="text-xl font-extrabold text-purple-700">
+                  {sentEmails.filter(e => e.category === 'coach_approved').length}
+                </span>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setEmailFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                    emailFilter === 'all' ? 'bg-navy-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  All ({sentEmails.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEmailFilter('session')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                    emailFilter === 'session' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Wednesday Sessions ({sentEmails.filter(e => e.category.startsWith('session_')).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEmailFilter('mentorship')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                    emailFilter === 'mentorship' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Mentorship ({sentEmails.filter(e => e.category.startsWith('mentorship_')).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEmailFilter('coach')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                    emailFilter === 'coach' ? 'bg-brand-orange text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Coach Volunteers ({sentEmails.filter(e => e.category.startsWith('coach_')).length})
+                </button>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search recipient or subject..."
+                  value={emailSearchQuery}
+                  onChange={(e) => setEmailSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand-orange"
+                />
+              </div>
+            </div>
+
+            {/* Email Dispatch Roster */}
+            {sentEmails.length === 0 ? (
+              <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                  <Mail className="w-7 h-7" />
+                </div>
+                <h3 className="text-base font-bold text-navy-900">No Emails Dispatched Yet</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Whenever an application is registered, accepted, or declined across the website, the instant notification email will be logged and visible here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sentEmails
+                  .filter(e => {
+                    if (emailFilter === 'session') return e.category.startsWith('session_');
+                    if (emailFilter === 'mentorship') return e.category.startsWith('mentorship_');
+                    if (emailFilter === 'coach') return e.category.startsWith('coach_');
+                    return true;
+                  })
+                  .filter(e => {
+                    if (!emailSearchQuery.trim()) return true;
+                    const q = emailSearchQuery.toLowerCase();
+                    return e.recipientEmail.toLowerCase().includes(q) ||
+                      e.recipientName.toLowerCase().includes(q) ||
+                      e.subject.toLowerCase().includes(q);
+                  })
+                  .map(email => {
+                    const isAccepted = email.category.includes('accepted') || email.category.includes('approved');
+                    const isDeclined = email.category.includes('declined');
+                    const isReceived = email.category.includes('submitted') || email.category.includes('confirmed');
+
+                    const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email.recipientEmail)}&su=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.plainText)}`;
+                    const mailtoUrl = `mailto:${email.recipientEmail}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.plainText)}`;
+
+                    return (
+                      <div
+                        key={email.id}
+                        className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 ${
+                                isAccepted
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : isDeclined
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-300'
+                              }`}
+                            >
+                              {isAccepted && '✓ Accepted'}
+                              {isDeclined && '✕ Declined'}
+                              {isReceived && 'ℹ Submission Received'}
+                            </span>
+                            <span className="text-xs font-extrabold text-navy-900 truncate">
+                              {email.recipientName}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              &lt;{email.recipientEmail}&gt;
+                            </span>
+                          </div>
+
+                          <h4 className="text-sm font-bold text-navy-900 truncate">
+                            {email.subject}
+                          </h4>
+
+                          <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {new Date(email.sentAt).toLocaleString()}
+                            </span>
+                            <span>•</span>
+                            <span className="text-emerald-700 font-semibold">
+                              ● Dispatched via Webhook / Outbox
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEmailForPreview(email)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-navy-900 text-xs font-bold transition-colors flex items-center gap-1.5"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Preview Rendered Email</span>
+                          </button>
+                          <a
+                            href={gmailComposeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold transition-colors flex items-center gap-1.5 border border-blue-200"
+                            title="Open in Gmail"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Open in Gmail</span>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modal: Full HTML Rendered Email Preview */}
+        {selectedEmailForPreview && (
+          <div className="fixed inset-0 z-50 bg-navy-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-fade-in border border-slate-200">
+              {/* Modal Header */}
+              <div className="p-5 bg-navy-900 text-white flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-brand-orange text-white text-[10px] font-extrabold uppercase">
+                      Official CIH Email Dispatch
+                    </span>
+                    <span className="text-xs text-slate-300">
+                      {new Date(selectedEmailForPreview.sentAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mt-1 truncate">
+                    {selectedEmailForPreview.subject}
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    To: <strong>{selectedEmailForPreview.recipientName}</strong> &lt;{selectedEmailForPreview.recipientEmail}&gt;
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEmailForPreview(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Rendered Email Content */}
+              <div className="p-6 overflow-y-auto flex-1 bg-slate-100">
+                <div 
+                  className="bg-white rounded-2xl shadow-sm overflow-hidden"
+                  dangerouslySetInnerHTML={{ __html: selectedEmailForPreview.htmlBody }}
+                />
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-between">
+                <span className="text-xs text-slate-400">
+                  Status: <strong>{selectedEmailForPreview.status.toUpperCase()}</strong>
+                </span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`mailto:${selectedEmailForPreview.recipientEmail}?subject=${encodeURIComponent(selectedEmailForPreview.subject)}&body=${encodeURIComponent(selectedEmailForPreview.plainText)}`}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                  >
+                    Open in Mail Client
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEmailForPreview(null)}
+                    className="px-5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold transition-colors"
+                  >
+                    Close Preview
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
