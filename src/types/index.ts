@@ -119,6 +119,26 @@ export interface MentorshipApplication {
   cohortEndDate?: string; // 3 months from cohortStartDate
 }
 
+export interface AlumniCoachApplication {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  alumniTrack: 'CIH Graduate / Alumni' | 'Hub Intern / IT Graduate' | 'Senior Fellow' | 'Industry Professional';
+  graduationYear?: string;
+  currentRole: string; // e.g. Software Engineer, Product Designer, Founder
+  organization?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
+  coachingDomain: string; // e.g. "Tech & AI", "Ethics & Leadership", "Career Growth & Job Search", "Cognitive Mindset & Life Skills"
+  statementOfPurpose: string; // Why do you want to coach and give back at CIH Wednesday Case Studies?
+  availability: 'On-site Wednesdays (Abesan Estate)' | 'Virtual 1-on-1 Breakouts' | 'Both On-site & Virtual';
+  yearsOfExperience?: string;
+  createdAt: string;
+  status: 'pending' | 'reviewed' | 'accepted' | 'declined';
+  adminNotes?: string;
+}
+
 export interface AdminConfig {
   appsScriptUrl: string;
   adminPasscode: string;

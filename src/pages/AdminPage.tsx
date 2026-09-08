@@ -28,9 +28,13 @@ import {
   Check,
   Search,
   Filter,
-  Mail,
-  Phone,
-  ArrowRight
+  Mail, 
+  Phone, 
+  ArrowRight,
+  Award,
+  ExternalLink,
+  GraduationCap,
+  Briefcase
 } from 'lucide-react';
 import { 
   getStoredCaseStudies, 
@@ -41,8 +45,10 @@ import {
   saveStoredRegistrations,
   getStoredFeedback,
   saveStoredFeedback,
-  getStoredMentorshipApplications,
+  getStoredMentorshipApplications, 
   saveStoredMentorshipApplications,
+  getStoredAlumniCoachApplications,
+  saveStoredAlumniCoachApplications,
   getStoredUserQuestions,
   saveStoredUserQuestions,
   getStoredTopicSuggestions,
@@ -56,6 +62,7 @@ import {
   AttendeeRecord, 
   CaseStudyFeedback, 
   MentorshipApplication, 
+  AlumniCoachApplication,
   FAQItem, 
   TopicSuggestion 
 } from '../types';
@@ -110,6 +117,11 @@ export const AdminPage: React.FC = () => {
   const [mentorshipFilter, setMentorshipFilter] = useState<'all' | 'pending' | 'reviewed' | 'accepted' | 'declined'>('all');
   const [selectedMentorshipAppForModal, setSelectedMentorshipAppForModal] = useState<MentorshipApplication | null>(null);
 
+  // Alumni Coach Applications State
+  const [mentorshipSubTab, setMentorshipSubTab] = useState<'mentees' | 'alumni-coaches'>('mentees');
+  const [alumniCoachApps, setAlumniCoachApps] = useState<AlumniCoachApplication[]>([]);
+  const [alumniFilter, setAlumniFilter] = useState<'all' | 'pending' | 'accepted' | 'reviewed' | 'declined'>('all');
+
   // User Questions State (FAQ Manager)
   const [userQuestions, setUserQuestions] = useState<FAQItem[]>([]);
   const [faqAnswerInputMap, setFaqAnswerInputMap] = useState<Record<string, string>>({});
@@ -133,6 +145,7 @@ export const AdminPage: React.FC = () => {
     setAttendees(getStoredRegistrations());
     setFeedbackList(getStoredFeedback());
     setMentorshipApps(getStoredMentorshipApplications());
+    setAlumniCoachApps(getStoredAlumniCoachApplications());
     setUserQuestions(getStoredUserQuestions());
     setTopicSuggestions(getStoredTopicSuggestions());
     setAdminConfig(getAdminConfig());
@@ -331,6 +344,57 @@ export const AdminPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Export Alumni Coach Applications to CSV
+  const handleExportAlumniCoachCSV = () => {
+    const headers = [
+      'Application ID',
+      'Alumnus Full Name',
+      'Gmail Address',
+      'Phone / WhatsApp',
+      'Alumni Track',
+      'Graduation Year',
+      'Current Professional Role',
+      'Organization',
+      'LinkedIn Profile',
+      'Coaching Domain Focus',
+      'Availability',
+      'Status',
+      'Date Submitted',
+      'Statement of Purpose'
+    ];
+    const rows = alumniCoachApps.map(app => [
+      `"${app.id}"`,
+      `"${app.fullName.replace(/"/g, '""')}"`,
+      `"${app.email}"`,
+      `"${app.phone}"`,
+      `"${app.alumniTrack}"`,
+      `"${app.graduationYear || 'N/A'}"`,
+      `"${(app.currentRole || '').replace(/"/g, '""')}"`,
+      `"${(app.organization || '').replace(/"/g, '""')}"`,
+      `"${app.linkedinUrl || ''}"`,
+      `"${(app.coachingDomain || '').replace(/"/g, '""')}"`,
+      `"${app.availability}"`,
+      `"${app.status || 'pending'}"`,
+      `"${new Date(app.createdAt).toLocaleString()}"`,
+      `"${app.statementOfPurpose.replace(/"/g, '""').replace(/\n/g, ' ')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `cih_alumni_coach_applications_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleAlumniStatusChange = (appId: string, newStatus: 'pending' | 'reviewed' | 'accepted' | 'declined') => {
+    const updated = alumniCoachApps.map(a => a.id === appId ? { ...a, status: newStatus } : a);
+    setAlumniCoachApps(updated);
+    saveStoredAlumniCoachApplications(updated);
   };
 
   // Attendee Selection & Acceptance Handler (Item 4, 8, 12: Generates ticket, schedules Tuesday dispatch)
@@ -538,6 +602,15 @@ export const AdminPage: React.FC = () => {
     if (mentorshipFilter === 'reviewed') return app.status === 'reviewed';
     if (mentorshipFilter === 'accepted') return app.status === 'accepted';
     if (mentorshipFilter === 'declined') return app.status === 'declined';
+    return true;
+  });
+
+  // Computations for Alumni Coach Applications
+  const filteredAlumniApps = alumniCoachApps.filter(app => {
+    if (alumniFilter === 'pending') return !app.status || app.status === 'pending';
+    if (alumniFilter === 'reviewed') return app.status === 'reviewed';
+    if (alumniFilter === 'accepted') return app.status === 'accepted';
+    if (alumniFilter === 'declined') return app.status === 'declined';
     return true;
   });
 
@@ -1315,16 +1388,50 @@ export const AdminPage: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 3: Personal Mentorship Applications (Item 11, 14, 16, 22, 23) */}
+        {/* Tab 3: Personal Mentorship & Alumni Coach Applications */}
         {activeTab === 'mentorship' && (
           <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-navy-900">Coach Mentorship Applications</h2>
-                <p className="text-xs text-slate-500">
-                  Review candidates applying for 1-on-1 coaching with approved CIH coaches (3-Month Term).
-                </p>
-              </div>
+            {/* Top Sub-Navigation for Mentorship Management */}
+            <div className="flex p-1.5 bg-slate-100 rounded-2xl max-w-xl border border-slate-200 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setMentorshipSubTab('mentees')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  mentorshipSubTab === 'mentees'
+                    ? 'bg-white text-navy-900 shadow-md ring-1 ring-slate-200'
+                    : 'text-slate-600 hover:text-navy-900'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-brand-orange" />
+                <span>Mentees Seeking Guidance ({mentorshipApps.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMentorshipSubTab('alumni-coaches')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  mentorshipSubTab === 'alumni-coaches'
+                    ? 'bg-brand-orange text-white shadow-md'
+                    : 'text-slate-600 hover:text-navy-900'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>Alumni Coach Applications ({alumniCoachApps.length})</span>
+                {alumniCoachApps.filter(a => !a.status || a.status === 'pending').length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse" />
+                )}
+              </button>
+            </div>
+
+            {/* SUB-TAB 1: MENTEES SEEKING GUIDANCE */}
+            {mentorshipSubTab === 'mentees' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-navy-900">Coach Mentorship Applications</h2>
+                    <p className="text-xs text-slate-500">
+                      Review candidates applying for 1-on-1 coaching with approved CIH coaches (3-Month Term).
+                    </p>
+                  </div>
 
               <div className="flex items-center gap-3">
                 <button
@@ -1471,6 +1578,237 @@ export const AdminPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* SUB-TAB 2: ALUMNI COACH APPLICATIONS */}
+        {mentorshipSubTab === 'alumni-coaches' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-navy-900 flex items-center gap-2">
+                  <span>CIH Alumni Coach &amp; Mentor Applications</span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-brand-orange">
+                    {alumniCoachApps.length} Total
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Review CIH Alumni, former interns, and industry experts volunteering to mentor breakout pods and facilitate Wednesday Case Studies.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleExportAlumniCoachCSV}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow transition-all"
+                >
+                  <Download className="w-4 h-4 text-brand-orange" />
+                  <span>Export Alumni Coaches to CSV</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setAlumniFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  alumniFilter === 'all' ? 'bg-navy-900 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                All Applications ({alumniCoachApps.length})
+              </button>
+              <button
+                onClick={() => setAlumniFilter('pending')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  alumniFilter === 'pending' ? 'bg-amber-500 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                Pending Review ({alumniCoachApps.filter(a => !a.status || a.status === 'pending').length})
+              </button>
+              <button
+                onClick={() => setAlumniFilter('accepted')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  alumniFilter === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                Approved Coaches ({alumniCoachApps.filter(a => a.status === 'accepted').length})
+              </button>
+              <button
+                onClick={() => setAlumniFilter('reviewed')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  alumniFilter === 'reviewed' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                Interviewing ({alumniCoachApps.filter(a => a.status === 'reviewed').length})
+              </button>
+              <button
+                onClick={() => setAlumniFilter('declined')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  alumniFilter === 'declined' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                Declined ({alumniCoachApps.filter(a => a.status === 'declined').length})
+              </button>
+            </div>
+
+            {filteredAlumniApps.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+                No alumni coach applications match this filter.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredAlumniApps.map(app => {
+                  const isPending = !app.status || app.status === 'pending';
+                  const isAccepted = app.status === 'accepted';
+                  const isReviewed = app.status === 'reviewed';
+                  const isDeclined = app.status === 'declined';
+
+                  return (
+                    <div key={app.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                      <div className="space-y-3.5">
+                        {/* Card Header */}
+                        <div className="flex items-start justify-between border-b border-slate-100 pb-3 gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base font-extrabold text-navy-900">{app.fullName}</h3>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-brand-orange border border-orange-200">
+                                {app.alumniTrack}
+                              </span>
+                              {app.graduationYear && (
+                                <span className="text-[10px] font-semibold text-slate-500">
+                                  Class of {app.graduationYear}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-700 mt-1 flex items-center gap-1.5">
+                              <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{app.currentRole}</span>
+                              {app.organization && <span className="text-slate-400 font-normal">at {app.organization}</span>}
+                            </p>
+                          </div>
+
+                          {/* Status Badge */}
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                            isAccepted ? 'bg-emerald-100 text-emerald-800' :
+                            isReviewed ? 'bg-blue-100 text-blue-800' :
+                            isDeclined ? 'bg-rose-100 text-rose-800' :
+                            'bg-amber-100 text-amber-800 ring-1 ring-amber-300'
+                          }`}>
+                            {isPending ? 'Pending Review' : isAccepted ? 'Approved Coach' : app.status}
+                          </span>
+                        </div>
+
+                        {/* Expertise & Availability Tags */}
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-bold uppercase text-[10px]">Coaching Domain:</span>
+                            <span className="font-bold text-navy-900 px-2 py-0.5 rounded bg-white border border-slate-200">
+                              {app.coachingDomain}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-600">
+                            <span className="text-slate-500 font-bold uppercase text-[10px]">Availability:</span>
+                            <span className="font-semibold text-slate-800">
+                              {app.availability}
+                            </span>
+                          </div>
+                          {app.linkedinUrl && (
+                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
+                              <span className="text-slate-500 font-bold uppercase text-[10px]">LinkedIn:</span>
+                              <a
+                                href={app.linkedinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-brand-orange hover:underline font-bold flex items-center gap-1"
+                              >
+                                <span>View Profile</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Contact Details */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                          <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100 truncate">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <a href={`mailto:${app.email}`} className="hover:text-brand-orange truncate font-medium">
+                              {app.email}
+                            </a>
+                          </div>
+                          <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <a href={`tel:${app.phone}`} className="hover:text-brand-orange font-medium">
+                              {app.phone}
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Statement of Purpose / Why Coach */}
+                        <div className="p-3.5 rounded-xl bg-amber-50/40 border border-amber-200/80 text-xs text-slate-800 space-y-1">
+                          <span className="font-bold text-amber-900 block text-[11px]">
+                            Statement of Purpose &amp; Coaching Philosophy:
+                          </span>
+                          <p className="leading-relaxed italic text-slate-700">
+                            "{app.statementOfPurpose}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Decision & Action Footer */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-[10px] text-slate-400">
+                          Applied: {new Date(app.createdAt).toLocaleDateString()}
+                        </span>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* WhatsApp Direct */}
+                          <a
+                            href={`https://api.whatsapp.com/send?phone=${app.phone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(`Hi ${app.fullName}, this is CIH Management regarding your application to volunteer as a Case Study Coach!`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold transition-colors"
+                          >
+                            WhatsApp
+                          </a>
+
+                          {/* Status Buttons */}
+                          {!isReviewed && (
+                            <button
+                              onClick={() => handleAlumniStatusChange(app.id, 'reviewed')}
+                              className="px-2.5 py-1 rounded-lg text-blue-600 hover:bg-blue-50 border border-blue-200 text-[11px] font-bold transition-colors"
+                            >
+                              Interviewing
+                            </button>
+                          )}
+
+                          {!isAccepted && (
+                            <button
+                              onClick={() => handleAlumniStatusChange(app.id, 'accepted')}
+                              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow transition-colors"
+                            >
+                              ✓ Approve as Coach
+                            </button>
+                          )}
+
+                          {!isDeclined && (
+                            <button
+                              onClick={() => handleAlumniStatusChange(app.id, 'declined')}
+                              className="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 text-[11px] font-bold transition-colors"
+                            >
+                              Decline
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )}
 
         {/* Tab 4: User FAQ Q&A Manager with Locking & 3-Click Emergency Unlock (Item 24) */}
         {activeTab === 'user-faq' && (

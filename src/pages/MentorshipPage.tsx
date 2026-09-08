@@ -18,10 +18,19 @@ import {
   ExternalLink, 
   Award,
   XCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Briefcase,
+  GraduationCap,
+  Building2
 } from 'lucide-react';
-import { getStoredMentorshipApplications, saveStoredMentorshipApplications, getAdminConfig } from '../services/storage';
-import { MentorshipApplication } from '../types';
+import { 
+  getStoredMentorshipApplications, 
+  saveStoredMentorshipApplications, 
+  getStoredAlumniCoachApplications, 
+  saveStoredAlumniCoachApplications, 
+  getAdminConfig 
+} from '../services/storage';
+import { MentorshipApplication, AlumniCoachApplication } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { isValidGmail, GMAIL_ERROR_MESSAGE } from '../utils/validation';
 import { COACH_IMAGES, getCoachImage } from '../data/coachImages';
@@ -115,8 +124,44 @@ export const MentorshipPage: React.FC = () => {
         email: user.email || prev.email,
         phone: user.phone || prev.phone,
       }));
+      setAlumniForm((prev) => ({
+        ...prev,
+        fullName: user.fullName || prev.fullName,
+        email: user.email || prev.email,
+        phone: user.phone || prev.phone,
+      }));
     }
   }, [user]);
+
+  // Mode: 'mentee' (seeking guidance) vs 'alumni-coach' (volunteering to coach)
+  const [applicationMode, setApplicationMode] = useState<'mentee' | 'alumni-coach'>('mentee');
+
+  // Alumni Coach Application State
+  const [alumniForm, setAlumniForm] = useState({
+    fullName: user?.fullName || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    alumniTrack: 'CIH Graduate / Alumni' as 'CIH Graduate / Alumni' | 'Hub Intern / IT Graduate' | 'Senior Fellow' | 'Industry Professional',
+    graduationYear: '2023',
+    currentRole: '',
+    organization: '',
+    linkedinUrl: '',
+    coachingDomain: 'Tech & AI / Technical Problem Solving',
+    availability: 'Both On-site & Virtual' as 'On-site Wednesdays (Abesan Estate)' | 'Virtual 1-on-1 Breakouts' | 'Both On-site & Virtual',
+    statementOfPurpose: ''
+  });
+  const [alumniSubmitted, setAlumniSubmitted] = useState(false);
+  const [alumniLoading, setAlumniLoading] = useState(false);
+
+  // Check URL query params for ?tab=become-coach or ?tab=coach
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'become-coach' || params.get('tab') === 'coach') {
+        setApplicationMode('alumni-coach');
+      }
+    }
+  }, []);
 
   // Calculate current word count
   const getWordCount = (text: string) => {
@@ -127,6 +172,71 @@ export const MentorshipPage: React.FC = () => {
 
   const currentWordCount = getWordCount(formData.reasonNeeded);
   const isWordCountExceeded = currentWordCount > 500;
+
+  const alumniWordCount = getWordCount(alumniForm.statementOfPurpose);
+  const isAlumniWordCountExceeded = alumniWordCount > 500;
+
+  const handleAlumniSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!alumniForm.fullName.trim() || !alumniForm.email.trim() || !alumniForm.phone.trim() || !alumniForm.currentRole.trim() || !alumniForm.statementOfPurpose.trim()) {
+      alert('Please fill out all required fields.');
+      return;
+    }
+
+    if (!isValidGmail(alumniForm.email)) {
+      alert(GMAIL_ERROR_MESSAGE);
+      return;
+    }
+
+    if (isAlumniWordCountExceeded) {
+      alert('Please keep your response within the 500 word limit.');
+      return;
+    }
+
+    setAlumniLoading(true);
+
+    const newApp: AlumniCoachApplication = {
+      id: `alumni-coach-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      fullName: alumniForm.fullName.trim(),
+      email: alumniForm.email.trim().toLowerCase(),
+      phone: alumniForm.phone.trim(),
+      alumniTrack: alumniForm.alumniTrack,
+      graduationYear: alumniForm.graduationYear.trim(),
+      currentRole: alumniForm.currentRole.trim(),
+      organization: alumniForm.organization.trim(),
+      linkedinUrl: alumniForm.linkedinUrl.trim(),
+      coachingDomain: alumniForm.coachingDomain,
+      availability: alumniForm.availability,
+      statementOfPurpose: alumniForm.statementOfPurpose.trim(),
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    const existing = getStoredAlumniCoachApplications();
+    const updated = [newApp, ...existing];
+    saveStoredAlumniCoachApplications(updated);
+
+    // Sync to Google Apps Script if URL configured
+    const config = getAdminConfig();
+    if (config.appsScriptUrl && config.appsScriptUrl.trim().startsWith('http')) {
+      try {
+        await fetch(config.appsScriptUrl.trim(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            source: 'CIH Alumni Coach Application',
+            type: 'alumni_coach_application',
+            ...newApp
+          })
+        });
+      } catch (err) {
+        console.error('Error syncing alumni application to webhook', err);
+      }
+    }
+
+    setAlumniLoading(false);
+    setAlumniSubmitted(true);
+  };
 
   const handleSelectMentor = (mentor: CoachProfile) => {
     setSelectedMentorId(mentor.id);
@@ -577,54 +687,85 @@ export const MentorshipPage: React.FC = () => {
               </div>
             ) : (
               /* ============================================================ */
-              /* STANDARD CANDIDATE APPLICATION FORM */
+              /* DUAL APPLICATION PATHWAY: MENTEE vs ALUMNI COACH */
               /* ============================================================ */
-              <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xl">
-                {submitted ? (
-                  <div className="text-center py-12 space-y-6 animate-fade-in">
-                    <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
-                      <CheckCircle2 className="w-10 h-10" />
-                    </div>
+              <div className="space-y-6">
+                {/* Pathway Switcher Tabs */}
+                <div className="flex p-1.5 bg-slate-100/90 rounded-2xl max-w-xl mx-auto border border-slate-200 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => setApplicationMode('mentee')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      applicationMode === 'mentee'
+                        ? 'bg-white text-navy-900 shadow-md ring-1 ring-slate-200'
+                        : 'text-slate-600 hover:text-navy-900'
+                    }`}
+                  >
+                    <UserCheck className="w-4 h-4 text-brand-orange" />
+                    <span>Apply for Mentorship (Mentee)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApplicationMode('alumni-coach')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      applicationMode === 'alumni-coach'
+                        ? 'bg-brand-orange text-white shadow-md'
+                        : 'text-slate-600 hover:text-navy-900'
+                    }`}
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>Volunteer as Coach (Alumni)</span>
+                  </button>
+                </div>
 
-                    <div className="space-y-2">
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-extrabold uppercase tracking-wider">
-                        <Clock className="w-3.5 h-3.5 text-brand-orange" /> Application Under Review
-                      </span>
-                      <h2 className="text-3xl font-extrabold text-navy-900">Application Submitted!</h2>
-                    </div>
-                    
-                    <p className="text-slate-600 text-base max-w-md mx-auto leading-relaxed">
-                      Thank you, <strong>{formData.fullName}</strong>. Your mentorship request with preferred coach (<strong>{formData.desiredMentor}</strong>) has been recorded for the upcoming <strong>3-Month Cohort</strong>. A CIH coach coordinator will review your profile and contact you via your Gmail (<strong>{formData.email}</strong>).
-                    </p>
+                {/* 1. MENTEE APPLICATION FORM */}
+                {applicationMode === 'mentee' && (
+                  <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xl">
+                    {submitted ? (
+                      <div className="text-center py-12 space-y-6 animate-fade-in">
+                        <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+                          <CheckCircle2 className="w-10 h-10" />
+                        </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 max-w-md mx-auto text-left text-xs space-y-1 text-slate-600">
-                      <p className="font-bold text-navy-900">What Happens Next?</p>
-                      <p>• Coaches evaluate applications on a rolling basis against our 3-month curriculum.</p>
-                      <p>• Shortlisted candidates receive an onboarding calendar invite.</p>
-                    </div>
+                        <div className="space-y-2">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-extrabold uppercase tracking-wider">
+                            <Clock className="w-3.5 h-3.5 text-brand-orange" /> Application Under Review
+                          </span>
+                          <h2 className="text-3xl font-extrabold text-navy-900">Application Submitted!</h2>
+                        </div>
+                        
+                        <p className="text-slate-600 text-base max-w-md mx-auto leading-relaxed">
+                          Thank you, <strong>{formData.fullName}</strong>. Your mentorship request with preferred coach (<strong>{formData.desiredMentor}</strong>) has been recorded for the upcoming <strong>3-Month Cohort</strong>. A CIH coach coordinator will review your profile and contact you via your Gmail (<strong>{formData.email}</strong>).
+                        </p>
 
-                    <div className="pt-4 flex justify-center">
-                      <button
-                        onClick={() => {
-                          setSubmitted(false);
-                          setFormData({
-                            fullName: '',
-                            email: '',
-                            phone: '',
-                            focusArea: 'Career Growth & Tech Leadership',
-                            desiredMentor: 'Any Available CIH Coach (Automatic Match)',
-                            reasonNeeded: ''
-                          });
-                          setSelectedMentorId('auto-match');
-                        }}
-                        className="px-6 py-3 rounded-xl bg-navy-900 text-white text-sm font-bold hover:bg-navy-800 transition-colors"
-                      >
-                        Submit Another Application
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 max-w-md mx-auto text-left text-xs space-y-1 text-slate-600">
+                          <p className="font-bold text-navy-900">What Happens Next?</p>
+                          <p>• Coaches evaluate applications on a rolling basis against our 3-month curriculum.</p>
+                          <p>• Shortlisted candidates receive an onboarding calendar invite.</p>
+                        </div>
+
+                        <div className="pt-4 flex justify-center">
+                          <button
+                            onClick={() => {
+                              setSubmitted(false);
+                              setFormData({
+                                fullName: '',
+                                email: '',
+                                phone: '',
+                                focusArea: 'Career Growth & Tech Leadership',
+                                desiredMentor: 'Any Available CIH Coach (Automatic Match)',
+                                reasonNeeded: ''
+                              });
+                              setSelectedMentorId('auto-match');
+                            }}
+                            className="px-6 py-3 rounded-xl bg-navy-900 text-white text-sm font-bold hover:bg-navy-800 transition-colors"
+                          >
+                            Submit Another Application
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-navy-50 text-navy-900 text-xs font-bold uppercase tracking-wider mb-2">
                         <UserCheck className="w-3.5 h-3.5 text-brand-orange" />
@@ -865,11 +1006,277 @@ export const MentorshipPage: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* 2. ALUMNI COACH APPLICATION FORM */}
+            {applicationMode === 'alumni-coach' && (
+              <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xl">
+                {alumniSubmitted ? (
+                  <div className="text-center py-12 space-y-6 animate-fade-in">
+                    <div className="w-20 h-20 rounded-full bg-orange-100 text-brand-orange flex items-center justify-center mx-auto shadow-inner">
+                      <Award className="w-10 h-10" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-extrabold uppercase tracking-wider">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Application Received by CIH Management
+                      </span>
+                      <h2 className="text-3xl font-extrabold text-navy-900">Thank You for Stepping Up to Coach!</h2>
+                    </div>
+
+                    <p className="text-slate-600 text-base max-w-md mx-auto leading-relaxed">
+                      We appreciate your commitment to give back to the Community Innovation Hub, <strong>{alumniForm.fullName}</strong>. Your coach application has been queued for executive board review. CIH Management will review your background in <strong>{alumniForm.coachingDomain}</strong> and reach out to you via your Gmail (<strong>{alumniForm.email}</strong>) and WhatsApp (<strong>{alumniForm.phone}</strong>) for coach orientation.
+                    </p>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 max-w-md mx-auto text-left text-xs space-y-1 text-slate-600">
+                      <p className="font-bold text-navy-900">Next Steps for Prospective Coaches:</p>
+                      <p>• Lead Coaching Board (Coach Adewale, Coach Soji, Coach Esther &amp; Coach Kehinde) review your profile and experience.</p>
+                      <p>• You will be invited to shadow an upcoming Wednesday Case Study session.</p>
+                      <p>• Upon approval, your coach profile and certified badge will be activated on the platform.</p>
+                    </div>
+
+                    <div className="pt-4 flex justify-center">
+                      <button
+                        onClick={() => {
+                          setAlumniSubmitted(false);
+                          setAlumniForm({
+                            fullName: user?.fullName || '',
+                            email: user?.email || '',
+                            phone: user?.phone || '',
+                            alumniTrack: 'CIH Graduate / Alumni',
+                            graduationYear: '2023',
+                            currentRole: '',
+                            organization: '',
+                            linkedinUrl: '',
+                            coachingDomain: 'Tech & AI / Technical Problem Solving',
+                            availability: 'Both On-site & Virtual',
+                            statementOfPurpose: ''
+                          });
+                        }}
+                        className="px-6 py-3 rounded-xl bg-navy-900 text-white text-sm font-bold hover:bg-navy-800 transition-colors"
+                      >
+                        Submit Another Application
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleAlumniSubmit} className="space-y-6">
+                    <div>
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 text-brand-orange text-xs font-bold uppercase tracking-wider mb-2 border border-orange-200">
+                        <Award className="w-3.5 h-3.5" />
+                        CIH Alumni &amp; Leaders • Volunteer as a Case Study Coach
+                      </div>
+                      <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900 tracking-tight">
+                        Apply to Become a Certified Coach / Mentor
+                      </h2>
+                      <p className="text-slate-500 text-sm mt-1">
+                        Empower the next generation at Community Innovation Hub. Facilitate syndicate breakout pods, challenge scenario presentations, and share authentic career frameworks during weekly Wednesday Case Studies.
+                      </p>
+                    </div>
+
+                    {/* Name & Gmail */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          Full Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Oluwaseun Balogun"
+                          value={alumniForm.fullName}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, fullName: e.target.value })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          Gmail Address <span className="text-brand-orange font-normal text-[10px]">(@gmail.com strictly required)</span> <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. seun.tech@gmail.com"
+                          value={alumniForm.email}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, email: e.target.value })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Phone & Alumni Track */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          Phone / WhatsApp Number <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="+234 800 000 0000"
+                          value={alumniForm.phone}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, phone: e.target.value })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          CIH Relationship / Track <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          value={alumniForm.alumniTrack}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, alumniTrack: e.target.value as any })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium bg-white"
+                        >
+                          <option value="CIH Graduate / Alumni">CIH Graduate / Alumni</option>
+                          <option value="Hub Intern / IT Graduate">Hub Intern / IT Graduate</option>
+                          <option value="Senior Fellow">Senior Fellow</option>
+                          <option value="Industry Professional">Industry Professional / External Partner</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Graduation Year & Current Professional Role */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          Cohort / Graduation Year
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 2023 or 2024"
+                          value={alumniForm.graduationYear}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, graduationYear: e.target.value })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          Current Professional Role &amp; Company <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Senior Frontend Engineer at Flutterwave"
+                          value={alumniForm.currentRole}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, currentRole: e.target.value })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* LinkedIn & Coaching Domain */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          LinkedIn Profile or Portfolio URL
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://linkedin.com/in/your-profile"
+                          value={alumniForm.linkedinUrl}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, linkedinUrl: e.target.value })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                          Primary Coaching Domain Focus <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          value={alumniForm.coachingDomain}
+                          onChange={(e) => setAlumniForm({ ...alumniForm, coachingDomain: e.target.value })}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium bg-white"
+                        >
+                          <option value="Tech &amp; AI / Technical Problem Solving">Tech &amp; AI / Technical Problem Solving</option>
+                          <option value="Ethics &amp; Adaptive Governance">Ethics &amp; Adaptive Governance</option>
+                          <option value="Career Transition &amp; Job Search">Career Transition &amp; Job Search</option>
+                          <option value="Cognitive Mindset, EQ &amp; Life Skills">Cognitive Mindset, EQ &amp; Life Skills</option>
+                          <option value="Public Speaking, Pitching &amp; Elevator Hook">Public Speaking, Pitching &amp; Elevator Hook</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Coaching Format Availability */}
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                        Coaching Availability <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={alumniForm.availability}
+                        onChange={(e) => setAlumniForm({ ...alumniForm, availability: e.target.value as any })}
+                        className="w-full px-4 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange text-slate-900 text-sm font-medium bg-white"
+                      >
+                        <option value="Both On-site &amp; Virtual">Both On-site Wednesdays &amp; Virtual 1-on-1s</option>
+                        <option value="On-site Wednesdays (Abesan Estate)">On-site Wednesdays (Plot 104, 5th Avenue Abesan Estate)</option>
+                        <option value="Virtual 1-on-1 Breakouts">Virtual 1-on-1 Breakout Pods</option>
+                      </select>
+                    </div>
+
+                    {/* Statement of Purpose */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider">
+                          Statement of Purpose &amp; Coaching Philosophy <span className="text-rose-500">*</span>
+                        </label>
+                        <span className={`text-xs font-bold ${
+                          isAlumniWordCountExceeded ? 'text-rose-600' : alumniWordCount > 450 ? 'text-amber-600' : 'text-slate-400'
+                        }`}>
+                          {alumniWordCount} / 500 words
+                        </span>
+                      </div>
+                      <textarea
+                        required
+                        rows={5}
+                        placeholder="Why do you want to coach during Wednesday Case Studies? What industry experience, frameworks, or leadership lessons do you want to impart to young innovators and IT interns?"
+                        value={alumniForm.statementOfPurpose}
+                        onChange={(e) => setAlumniForm({ ...alumniForm, statementOfPurpose: e.target.value })}
+                        className={`w-full px-4 py-3.5 rounded-xl border text-slate-900 text-sm font-medium resize-none transition-all ${
+                          isAlumniWordCountExceeded
+                            ? 'border-rose-400 focus:ring-2 focus:ring-rose-400 focus:outline-none bg-rose-50/20'
+                            : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-orange'
+                        }`}
+                      />
+                      {isAlumniWordCountExceeded ? (
+                        <p className="text-xs font-bold text-rose-600 mt-1">
+                          ⚠️ Your statement exceeds the 500 word limit ({alumniWordCount} words). Please condense your response to submit.
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Maximum 500 words. Describe the specific impact and guidance you hope to deliver as a coach.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={alumniLoading || isAlumniWordCountExceeded}
+                      className="w-full py-4 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white text-base font-bold shadow-lg hover:shadow-orange-glow transition-all active:scale-98 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {alumniLoading ? (
+                        <span>Submitting Coach Application...</span>
+                      ) : (
+                        <>
+                          <span>Submit Coach Application to CIH Management</span>
+                          <Send className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
+        )}
         </div>
-      </section>
-    </div>
-  );
+      </div>
+    </section>
+  </div>
+);
 };
 
 export default MentorshipPage;

@@ -268,10 +268,10 @@ export const ProfilePage: React.FC = () => {
                         <p className="text-[10px] text-slate-500">Join the official 1-on-1 coaching cohorts or spar with hub directors.</p>
                       </div>
                       <Link
-                        to="/mentorship"
+                        to="/mentorship?tab=become-coach"
                         className="px-3 py-1.5 rounded-lg bg-brand-orange hover:bg-brand-orange-hover text-white text-[11px] font-bold shrink-0 transition-all flex items-center gap-1 shadow-2xs"
                       >
-                        <span>Go to Mentorship</span>
+                        <span>Apply to Coach</span>
                         <ArrowRight className="w-3 h-3" />
                       </Link>
                     </div>

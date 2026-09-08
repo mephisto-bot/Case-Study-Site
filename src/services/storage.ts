@@ -1,4 +1,4 @@
-import { CaseStudy, UpcomingSession, AttendeeRecord, CaseStudyFeedback, MentorshipApplication, FAQItem, TopicSuggestion, AdminConfig, Testimonial, AuthUser, RememberedAccount } from '../types';
+import { CaseStudy, UpcomingSession, AttendeeRecord, CaseStudyFeedback, MentorshipApplication, AlumniCoachApplication, FAQItem, TopicSuggestion, AdminConfig, Testimonial, AuthUser, RememberedAccount } from '../types';
 import { initialCaseStudies, initialUpcomingSession, initialTestimonials } from '../data/initialData';
 
 const CASE_STUDIES_KEY = 'cih_case_studies_v2';
@@ -7,6 +7,7 @@ const REGISTRATIONS_KEY = 'cih_registrations_v1';
 const ADMIN_CONFIG_KEY = 'cih_admin_config_v1';
 const FEEDBACK_KEY = 'cih_feedback_v2';
 const MENTORSHIP_KEY = 'cih_mentorship_v1';
+const ALUMNI_COACH_KEY = 'cih_alumni_coach_applications_v1';
 const USER_QUESTIONS_KEY = 'cih_user_questions_v1';
 const TOPIC_SUGGESTIONS_KEY = 'cih_topic_suggestions_v1';
 const TESTIMONIALS_KEY = 'cih_testimonials_v1';
@@ -222,6 +223,63 @@ export const saveStoredMentorshipApplications = (apps: MentorshipApplication[]):
     localStorage.setItem(MENTORSHIP_KEY, JSON.stringify(apps));
   } catch (err) {
     console.error('Error saving mentorship applications', err);
+  }
+};
+
+// Alumni Coach / Mentor Applications (For Alumni Volunteering to Coach)
+export const getStoredAlumniCoachApplications = (): AlumniCoachApplication[] => {
+  try {
+    const saved = localStorage.getItem(ALUMNI_COACH_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (err) {
+    console.error('Error loading alumni coach applications', err);
+  }
+  const now = Date.now();
+  return [
+    {
+      id: 'alumni-coach-1',
+      fullName: 'Oluwaseun Balogun',
+      email: 'seun.balogun.tech@gmail.com',
+      phone: '+234 814 555 0192',
+      alumniTrack: 'CIH Graduate / Alumni',
+      graduationYear: '2023',
+      currentRole: 'Senior Frontend Engineer at Flutterwave',
+      organization: 'Flutterwave',
+      linkedinUrl: 'https://linkedin.com/in/oluwaseun-balogun',
+      coachingDomain: 'Tech & AI / Technical Problem Solving',
+      statementOfPurpose: 'CIH shaped the foundation of my software career. I want to give back by leading Wednesday technical scenario breakouts, mentoring junior developers on code architecture, interview readiness, and workplace resilience.',
+      availability: 'Both On-site & Virtual',
+      yearsOfExperience: '4+ Years',
+      createdAt: new Date(now - 86400000 * 3).toISOString(),
+      status: 'pending'
+    },
+    {
+      id: 'alumni-coach-2',
+      fullName: 'Amina Yusuf',
+      email: 'amina.yusuf.lead@gmail.com',
+      phone: '+234 809 333 8812',
+      alumniTrack: 'Senior Fellow',
+      graduationYear: '2022',
+      currentRole: 'Lead Product Strategist & Founder',
+      organization: 'Kora Ventures',
+      linkedinUrl: 'https://linkedin.com/in/amina-yusuf-strategy',
+      coachingDomain: 'Ethics & Leadership / Pitching & Elevator Decks',
+      statementOfPurpose: 'Having graduated from the early CIH fellowship cohorts, I understand the transformative power of practical case study debates. I want to guide participants in dissecting business models, ethical trade-offs, and executive storytelling.',
+      availability: 'On-site Wednesdays (Abesan Estate)',
+      yearsOfExperience: '5+ Years',
+      createdAt: new Date(now - 86400000 * 5).toISOString(),
+      status: 'accepted'
+    }
+  ];
+};
+
+export const saveStoredAlumniCoachApplications = (apps: AlumniCoachApplication[]): void => {
+  try {
+    localStorage.setItem(ALUMNI_COACH_KEY, JSON.stringify(apps));
+  } catch (err) {
+    console.error('Error saving alumni coach applications', err);
   }
 };
 
