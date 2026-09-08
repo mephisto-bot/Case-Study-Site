@@ -501,6 +501,38 @@ export const getStoredUsers = (): (AuthUser & { passwordHash?: string })[] => {
       mentorFocusAreas: ['Cognitive Decision Science', 'Youth Empowerment & Leadership IKIGAI'],
       mentorBio: 'Co-Founder and on-site coach leading youth empowerment and cognitive decision science.',
       createdAt: '2026-06-01T08:00:00.000Z'
+    },
+    {
+      id: 'usr-coach-soji',
+      fullName: 'Soji Megbowon',
+      email: 'soji.megbowon@gmail.com',
+      passwordHash: 'coach123',
+      phone: '+234 802 888 7766',
+      role: 'alumni',
+      isAlumni: true,
+      isApprovedMentor: true,
+      mentorRole: 'Coach',
+      alumniCohort: 'Hub Co-Founder',
+      linkedinUrl: 'https://www.linkedin.com/in/soji-megbowon-50a04269',
+      mentorFocusAreas: ['Interactive Scenario Analysis', 'Strategic Innovation & Growth'],
+      mentorBio: 'Co-Founder & Lead Facilitator / Coach leading strategic scenario analysis.',
+      createdAt: '2026-06-01T08:00:00.000Z'
+    },
+    {
+      id: 'usr-coach-amina',
+      fullName: 'Amina Yusuf',
+      email: 'amina.yusuf.lead@gmail.com',
+      passwordHash: 'coach123',
+      phone: '+234 809 333 8812',
+      role: 'alumni',
+      isAlumni: true,
+      isApprovedMentor: true,
+      mentorRole: 'Coach',
+      alumniCohort: 'Senior Fellow 2022',
+      linkedinUrl: 'https://linkedin.com/in/amina-yusuf-strategy',
+      mentorFocusAreas: ['Ethics & Leadership', 'Pitching & Elevator Decks'],
+      mentorBio: 'Lead Product Strategist and approved CIH Coach mentoring junior innovators.',
+      createdAt: '2026-07-01T08:00:00.000Z'
     }
   ];
 };

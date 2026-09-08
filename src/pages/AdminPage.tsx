@@ -54,7 +54,11 @@ import {
   getStoredTopicSuggestions,
   saveStoredTopicSuggestions,
   getAdminConfig,
-  saveAdminConfig
+  saveAdminConfig,
+  getStoredUsers,
+  saveStoredUsers,
+  getStoredAuthUser,
+  saveStoredAuthUser
 } from '../services/storage';
 import { 
   CaseStudy, 
@@ -395,6 +399,54 @@ export const AdminPage: React.FC = () => {
     const updated = alumniCoachApps.map(a => a.id === appId ? { ...a, status: newStatus } : a);
     setAlumniCoachApps(updated);
     saveStoredAlumniCoachApplications(updated);
+
+    // If approved as coach, automatically grant certified coach permissions to matching user account
+    if (newStatus === 'accepted') {
+      const targetApp = alumniCoachApps.find(a => a.id === appId);
+      if (targetApp) {
+        try {
+          const allUsers = getStoredUsers();
+          const targetEmail = targetApp.email.toLowerCase().trim();
+          const targetName = targetApp.fullName.toLowerCase().trim();
+
+          const updatedUsers = allUsers.map(u => {
+            const matchesEmail = u.email && u.email.toLowerCase().trim() === targetEmail;
+            const matchesName = u.fullName && u.fullName.toLowerCase().trim() === targetName;
+            if (matchesEmail || matchesName) {
+              return {
+                ...u,
+                isApprovedMentor: true,
+                mentorRole: 'Coach' as const,
+                isMentorVolunteer: true,
+                role: 'alumni' as const,
+                mentorBio: targetApp.statementOfPurpose || u.mentorBio
+              };
+            }
+            return u;
+          });
+          saveStoredUsers(updatedUsers);
+
+          // Update currently logged in auth user if it matches
+          const currentAuth = getStoredAuthUser();
+          if (currentAuth) {
+            const matchesAuthEmail = currentAuth.email && currentAuth.email.toLowerCase().trim() === targetEmail;
+            const matchesAuthName = currentAuth.fullName && currentAuth.fullName.toLowerCase().trim() === targetName;
+            if (matchesAuthEmail || matchesAuthName) {
+              saveStoredAuthUser({
+                ...currentAuth,
+                isApprovedMentor: true,
+                mentorRole: 'Coach',
+                isMentorVolunteer: true,
+                role: 'alumni',
+                mentorBio: targetApp.statementOfPurpose || currentAuth.mentorBio
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error synchronizing coach permissions', err);
+        }
+      }
+    }
   };
 
   // Attendee Selection & Acceptance Handler (Item 4, 8, 12: Generates ticket, schedules Tuesday dispatch)
