@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { AttendeeRecord, AuthUser } from '../types';
+import { AttendeeRecord, AuthUser, MentorshipApplication, AlumniCoachApplication } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -20,7 +20,7 @@ export const supabase: SupabaseClient = createClient(
 );
 
 /**
- * Inserts an on-site Wednesday Case Study registration into Supabase
+ * Inserts an on-site Wednesday Case Study registration into Supabase (including essay)
  */
 export const insertRegistrationToSupabase = async (
   record: AttendeeRecord,
@@ -31,24 +31,34 @@ export const insertRegistrationToSupabase = async (
     return { success: false, error: 'Supabase credentials not configured.' };
   }
 
+  const rowWithEssay = {
+    id: record.id,
+    full_name: record.fullName,
+    email: record.email,
+    phone: record.phone,
+    attendee_type: record.attendeeType,
+    media_consent: record.mediaConsent,
+    session_date: sessionDate || new Date().toISOString().split('T')[0],
+    status: record.status || 'pending',
+    attendance_essay: record.attendanceEssay || null,
+    created_at: record.timestamp || new Date().toISOString()
+  };
+
   try {
     const { error } = await supabase
       .from('registrations')
-      .insert([
-        {
-          id: record.id,
-          full_name: record.fullName,
-          email: record.email,
-          phone: record.phone,
-          attendee_type: record.attendeeType,
-          media_consent: record.mediaConsent,
-          session_date: sessionDate || new Date().toISOString().split('T')[0],
-          status: record.status || 'confirmed',
-          created_at: record.timestamp || new Date().toISOString()
-        }
-      ]);
+      .insert([rowWithEssay]);
 
     if (error) {
+      // If error indicates attendance_essay column is not yet migrated, insert without it so user registration succeeds
+      if (error.message && (error.message.includes('attendance_essay') || error.message.includes('column'))) {
+        const { attendance_essay, ...rowWithoutEssay } = rowWithEssay;
+        const fallback = await supabase.from('registrations').insert([rowWithoutEssay]);
+        if (fallback.error) {
+          return { success: false, error: fallback.error.message };
+        }
+        return { success: true };
+      }
       console.error('Supabase registration insert error:', error);
       return { success: false, error: error.message };
     }
@@ -84,6 +94,7 @@ export const fetchRegistrationsFromSupabase = async (): Promise<AttendeeRecord[]
       phone: row.phone,
       attendeeType: row.attendee_type,
       mediaConsent: row.media_consent,
+      attendanceEssay: row.attendance_essay || undefined,
       timestamp: row.created_at,
       status: row.status,
       syncedToGoogleSheets: true
@@ -131,6 +142,85 @@ export const insertUserToSupabase = async (
     return { success: true };
   } catch (err: any) {
     console.error('Supabase user exception:', err);
+    return { success: false, error: err?.message };
+  }
+};
+
+/**
+ * Inserts 1-on-1 mentorship application into Supabase (if table exists)
+ */
+export const insertMentorshipToSupabase = async (
+  app: MentorshipApplication
+): Promise<{ success: boolean; error?: string }> => {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: 'Supabase not configured.' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('mentorship_applications')
+      .insert([
+        {
+          id: app.id,
+          full_name: app.fullName,
+          email: app.email,
+          phone: app.phone,
+          focus_area: app.focusArea,
+          desired_mentor: app.desiredMentor,
+          reason_needed: app.reasonNeeded,
+          cohort_start_date: app.cohortStartDate,
+          cohort_end_date: app.cohortEndDate,
+          status: app.status,
+          created_at: app.createdAt || new Date().toISOString()
+        }
+      ]);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message };
+  }
+};
+
+/**
+ * Inserts Alumni Coach volunteer application into Supabase (if table exists)
+ */
+export const insertAlumniCoachToSupabase = async (
+  app: AlumniCoachApplication
+): Promise<{ success: boolean; error?: string }> => {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: 'Supabase not configured.' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('alumni_coach_applications')
+      .insert([
+        {
+          id: app.id,
+          full_name: app.fullName,
+          email: app.email,
+          phone: app.phone,
+          alumni_track: app.alumniTrack,
+          graduation_year: app.graduationYear,
+          current_role: app.currentRole,
+          organization: app.organization,
+          linkedin_url: app.linkedinUrl,
+          coaching_domain: app.coachingDomain,
+          availability: app.availability,
+          statement_of_purpose: app.statementOfPurpose,
+          status: app.status,
+          created_at: app.createdAt || new Date().toISOString()
+        }
+      ]);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
     return { success: false, error: err?.message };
   }
 };

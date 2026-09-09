@@ -160,10 +160,63 @@ function doPost(e) {
       data = e.parameter || {};
     }
 
+    // Branch by action type
+    const action = data.action || '';
+
+    // =========================================================================
+    // 1. Mentorship Student Application
+    // =========================================================================
+    if (action === 'submitMentorship') {
+      recordMentorshipToSheet(data);
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'Mentorship application safely archived in Google Sheets.' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // 2. Alumni Coach Volunteer Application
+    // =========================================================================
+    if (action === 'submitAlumniCoachApplication') {
+      recordAlumniCoachToSheet(data);
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'Alumni coach application safely archived in Google Sheets.' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // 3. Outgoing Notification Email Dispatch
+    // =========================================================================
+    if (action === 'sendNotificationEmail') {
+      const toEmail = (data.toEmail || '').trim().toLowerCase();
+      const subject = data.subject || 'CIH Notification';
+      const htmlBody = data.htmlBody || '';
+      const plainText = data.plainText || '';
+      if (toEmail && htmlBody) {
+        try {
+          MailApp.sendEmail({
+            to: toEmail,
+            subject: subject,
+            htmlBody: htmlBody,
+            body: plainText,
+            name: 'Community Innovation Hub'
+          });
+        } catch (mailErr) {
+          Logger.log('Notification email dispatch notice: ' + mailErr.toString());
+        }
+      }
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'Notification email dispatched.' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // 4. Standard Wednesday Case Study Session Registration (Default)
+    // =========================================================================
     const fullName = (data.fullName || data.name || 'Participant').trim();
     const email = (data.email || '').trim().toLowerCase();
     const phone = (data.phone || 'N/A').trim();
     const attendeeType = data.attendeeType || 'GUEST';
+    const attendanceEssay = data.attendanceEssay || data.essay || 'N/A';
     const timestamp = data.timestamp || new Date().toISOString();
     const ticketImageData = data.ticketImageData || null;
 
@@ -173,8 +226,8 @@ function doPost(e) {
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 1. Record in Google Sheets (Keeps full log without cluttering Gmail inbox)
-    recordAttendeeToSheet(fullName, email, phone, attendeeType, timestamp);
+    // 1. Record in Google Sheets (Stores full profile & full essay permanently)
+    recordAttendeeToSheet(fullName, email, phone, attendeeType, attendanceEssay, timestamp);
 
     // 2. Fetch latest weekly session parameters
     const sessionDetails = getSessionDetails();
@@ -193,7 +246,7 @@ function doPost(e) {
       JSON.stringify({
         status: 'success',
         emailSent: emailSent,
-        message: 'Registration recorded successfully and ticket email delivered to attendee.',
+        message: 'Registration & essay recorded successfully in Google Sheets.',
         attendee: { fullName, email, phone, attendeeType, timestamp },
         session: sessionDetails
       })
@@ -226,9 +279,9 @@ function doGet(e) {
 }
 
 /**
- * Helper to record row to the active spreadsheet
+ * Helper to record Wednesday Attendee row to Google Sheet (including full essay)
  */
-function recordAttendeeToSheet(fullName, email, phone, attendeeType, timestamp) {
+function recordAttendeeToSheet(fullName, email, phone, attendeeType, attendanceEssay, timestamp) {
   const ss = getSpreadsheet();
   if (!ss) {
     throw new Error("No Google Sheet resolved.");
@@ -248,14 +301,124 @@ function recordAttendeeToSheet(fullName, email, phone, attendeeType, timestamp) 
 
   // If sheet is empty, create headers
   if (sheet.getLastRow() === 0) {
-    const headerRow = ['Timestamp (WAT)', 'Full Name', 'Email Address', 'Phone Number', 'Attendee Type', 'Confirmation Sent', 'Attendance Status'];
+    const headerRow = [
+      'Timestamp (WAT)',
+      'Full Name',
+      'Email Address',
+      'Phone Number',
+      'Attendee Type',
+      'Attendance Essay (Full Text)',
+      'Confirmation Sent',
+      'Attendance Status'
+    ];
     sheet.appendRow(headerRow);
-    sheet.getRange('A1:G1').setFontWeight('bold').setBackground('#07152B').setFontColor('#FFFFFF');
+    sheet.getRange('A1:H1').setFontWeight('bold').setBackground('#07152B').setFontColor('#FFFFFF');
     sheet.setFrozenRows(1);
   }
 
   const dateFormatted = Utilities.formatDate(new Date(timestamp), 'GMT+1', 'yyyy-MM-dd HH:mm:ss');
-  sheet.appendRow([dateFormatted, fullName, email, phone, attendeeType, 'Yes', 'Registered']);
+  sheet.appendRow([dateFormatted, fullName, email, phone, attendeeType, attendanceEssay, 'Yes', 'Registered']);
+}
+
+/**
+ * Helper to record 1-on-1 Mentorship Application into 'MentorshipApplications' tab
+ */
+function recordMentorshipToSheet(data) {
+  const ss = getSpreadsheet();
+  if (!ss) return;
+
+  const MENTORSHIP_SHEET = 'MentorshipApplications';
+  let sheet = ss.getSheetByName(MENTORSHIP_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(MENTORSHIP_SHEET);
+  }
+
+  if (sheet.getLastRow() === 0) {
+    const headerRow = [
+      'Timestamp (WAT)',
+      'Application ID',
+      'Full Name',
+      'Email Address',
+      'Phone Number',
+      'Focus Area',
+      'Desired Coach',
+      'Reason Needed / Essay (Full Text)',
+      'Cohort Dates',
+      'Status'
+    ];
+    sheet.appendRow(headerRow);
+    sheet.getRange('A1:J1').setFontWeight('bold').setBackground('#059669').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+  }
+
+  const dateFormatted = Utilities.formatDate(new Date(data.createdAt || new Date()), 'GMT+1', 'yyyy-MM-dd HH:mm:ss');
+  const cohortDates = (data.cohortStartDate ? data.cohortStartDate.substring(0, 10) : '') + ' to ' + (data.cohortEndDate ? data.cohortEndDate.substring(0, 10) : '');
+  sheet.appendRow([
+    dateFormatted,
+    data.id || 'N/A',
+    data.fullName || 'N/A',
+    data.email || 'N/A',
+    data.phone || 'N/A',
+    data.focusArea || 'N/A',
+    data.desiredMentor || 'N/A',
+    data.reasonNeeded || 'N/A',
+    cohortDates,
+    data.status || 'pending'
+  ]);
+}
+
+/**
+ * Helper to record Alumni Coach Application into 'CoachApplications' tab
+ */
+function recordAlumniCoachToSheet(data) {
+  const ss = getSpreadsheet();
+  if (!ss) return;
+
+  const COACH_SHEET = 'CoachApplications';
+  let sheet = ss.getSheetByName(COACH_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(COACH_SHEET);
+  }
+
+  if (sheet.getLastRow() === 0) {
+    const headerRow = [
+      'Timestamp (WAT)',
+      'Application ID',
+      'Full Name',
+      'Email Address',
+      'Phone Number',
+      'Alumni Track',
+      'Graduation Year',
+      'Current Role',
+      'Organization',
+      'LinkedIn URL',
+      'Coaching Domain',
+      'Availability',
+      'Statement of Purpose / Essay (Full Text)',
+      'Status'
+    ];
+    sheet.appendRow(headerRow);
+    sheet.getRange('A1:N1').setFontWeight('bold').setBackground('#FF6B00').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+  }
+
+  const dateFormatted = Utilities.formatDate(new Date(data.createdAt || new Date()), 'GMT+1', 'yyyy-MM-dd HH:mm:ss');
+  sheet.appendRow([
+    dateFormatted,
+    data.id || 'N/A',
+    data.fullName || 'N/A',
+    data.email || 'N/A',
+    data.phone || 'N/A',
+    data.alumniTrack || 'N/A',
+    data.graduationYear || 'N/A',
+    data.currentRole || 'N/A',
+    data.organization || 'N/A',
+    data.linkedinUrl || 'N/A',
+    data.coachingDomain || 'N/A',
+    data.availability || 'N/A',
+    data.statementOfPurpose || 'N/A',
+    data.status || 'pending'
+  ]);
 }
 
 /**

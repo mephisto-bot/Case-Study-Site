@@ -47,6 +47,7 @@ import {
   sendMenteeDeclinedEmail, 
   sendCoachApplicationReceivedEmail 
 } from '../services/emailService';
+import { insertMentorshipToSupabase, insertAlumniCoachToSupabase } from '../services/supabase';
 
 export interface CoachProfile {
   id: string;
@@ -347,6 +348,13 @@ export const MentorshipPage: React.FC = () => {
       }
     }
 
+    // Sync to Supabase Database (if configured)
+    try {
+      await insertMentorshipToSupabase(newApp);
+    } catch (sbErr) {
+      console.warn('Supabase mentorship sync notice:', sbErr);
+    }
+
     // Send instant confirmation email to applicant
     try {
       await sendMenteeApplicationReceivedEmail(newApp);
@@ -413,6 +421,13 @@ export const MentorshipPage: React.FC = () => {
       } catch (err) {
         console.error('Apps Script dispatch notice:', err);
       }
+    }
+
+    // Sync to Supabase Database (if configured)
+    try {
+      await insertAlumniCoachToSupabase(newApp);
+    } catch (sbErr) {
+      console.warn('Supabase coach sync notice:', sbErr);
     }
 
     // Send instant confirmation email to alumni coach applicant
