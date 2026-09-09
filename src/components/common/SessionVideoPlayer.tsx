@@ -30,12 +30,17 @@ export const SessionVideoPlayer: React.FC<SessionVideoPlayerProps> = ({
   const isYouTube = Boolean(ytId);
   const ytEmbedUrl = isYouTube ? getYouTubeEmbedUrl(ytId) : null;
 
+  const [hasError, setHasError] = useState(false);
+
   // Toggle play for HTML5 video
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (videoRef.current.paused) {
-      videoRef.current.play();
-      setIsPlaying(true);
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        console.warn('Video play attempt error:', err);
+      });
     } else {
       videoRef.current.pause();
       setIsPlaying(false);
@@ -53,6 +58,10 @@ export const SessionVideoPlayer: React.FC<SessionVideoPlayerProps> = ({
     if (videoRef.current.requestFullscreen) {
       videoRef.current.requestFullscreen();
     }
+  };
+
+  const handleVideoError = () => {
+    setHasError(true);
   };
 
   return (
@@ -81,19 +90,22 @@ export const SessionVideoPlayer: React.FC<SessionVideoPlayerProps> = ({
             allowFullScreen
           />
         </div>
-      ) : videoUrl ? (
+      ) : videoUrl && !hasError ? (
         <div className="relative w-full aspect-video bg-black flex items-center justify-center">
           <video
             ref={videoRef}
-            src={videoUrl}
             poster={posterUrl}
             playsInline
             controls
             preload="metadata"
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onError={handleVideoError}
             className="w-full h-full object-contain"
-          />
+          >
+            <source src={videoUrl} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
 
           {/* Quick Play Overlay if not playing */}
           {!isPlaying && (
@@ -105,6 +117,37 @@ export const SessionVideoPlayer: React.FC<SessionVideoPlayerProps> = ({
               <Play className="w-8 h-8 sm:w-10 sm:h-10 ml-1 fill-white" />
             </button>
           )}
+        </div>
+      ) : videoUrl && hasError ? (
+        <div className="relative w-full aspect-video bg-navy-950 flex flex-col items-center justify-center p-6 text-center text-slate-300 space-y-3">
+          <div className="w-14 h-14 rounded-2xl bg-navy-900 border border-white/10 flex items-center justify-center">
+            <Video className="w-7 h-7 text-brand-orange" />
+          </div>
+          <div className="space-y-1 max-w-sm">
+            <p className="text-sm font-bold text-white">Video Playback Notice</p>
+            <p className="text-xs text-slate-400">
+              The video stream could not be loaded directly by your browser codec.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={() => {
+                setHasError(false);
+                if (videoRef.current) videoRef.current.load();
+              }}
+              className="px-4 py-2 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold transition-all shadow-md"
+            >
+              Retry Playback
+            </button>
+            <a
+              href={videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-xl bg-navy-800 hover:bg-navy-700 text-white text-xs font-bold border border-white/10 transition-all"
+            >
+              Open Direct Stream
+            </a>
+          </div>
         </div>
       ) : (
         <div className="relative w-full aspect-video bg-navy-900 flex flex-col items-center justify-center p-6 text-center text-slate-400">
