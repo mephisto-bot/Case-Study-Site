@@ -85,11 +85,17 @@ import {
   sendCoachApprovedEmail, 
   sendCoachDeclinedEmail 
 } from '../services/emailService';
+import { fetchCloudAdminData, updateCloudRecordStatus } from '../services/api';
 
 export const AdminPage: React.FC = () => {
   const [passcode, setPasscode] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState('');
+
+  // Real-Time Cloud Sync State across all devices
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const [lastCloudSyncTime, setLastCloudSyncTime] = useState<string | null>(null);
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<
     'case-studies' | 'upcoming' | 'attendees' | 'feedback' | 'mentorship' | 'user-faq' | 'topic-suggestions' | 'email-outbox' | 'settings'
@@ -111,7 +117,8 @@ export const AdminPage: React.FC = () => {
     fullContent: '',
     keyTakeaways: [''],
     discussionQuestions: [''],
-    featured: false
+    featured: false,
+    videoUrl: ''
   });
 
   // Upcoming Session State
@@ -127,19 +134,21 @@ export const AdminPage: React.FC = () => {
 
   // Feedback State
   const [feedbackList, setFeedbackList] = useState<CaseStudyFeedback[]>([]);
+  const [feedbackFilter, setFeedbackFilter] = useState<string>('all');
   const [replyInputMap, setReplyInputMap] = useState<Record<string, string>>({});
 
-  // Mentorship State
+  // Mentorship Applications State
   const [mentorshipApps, setMentorshipApps] = useState<MentorshipApplication[]>([]);
-  const [mentorshipFilter, setMentorshipFilter] = useState<'all' | 'pending' | 'reviewed' | 'accepted' | 'declined'>('all');
   const [selectedMentorshipAppForModal, setSelectedMentorshipAppForModal] = useState<MentorshipApplication | null>(null);
+  const [mentorshipFilter, setMentorshipFilter] = useState<'all' | 'pending' | 'reviewed' | 'accepted' | 'declined'>('all');
 
   // Alumni Coach Applications State
   const [mentorshipSubTab, setMentorshipSubTab] = useState<'mentees' | 'alumni-coaches'>('mentees');
   const [alumniCoachApps, setAlumniCoachApps] = useState<AlumniCoachApplication[]>([]);
+  const [selectedAlumniCoachForModal, setSelectedAlumniCoachForModal] = useState<AlumniCoachApplication | null>(null);
   const [alumniFilter, setAlumniFilter] = useState<'all' | 'pending' | 'accepted' | 'reviewed' | 'declined'>('all');
 
-  // User Questions State (FAQ Manager)
+  // User FAQ Questions State
   const [userQuestions, setUserQuestions] = useState<FAQItem[]>([]);
   const [faqAnswerInputMap, setFaqAnswerInputMap] = useState<Record<string, string>>({});
   const [emergencyAttempts, setEmergencyAttempts] = useState<Record<string, number>>({});
@@ -158,6 +167,91 @@ export const AdminPage: React.FC = () => {
   const [emailFilter, setEmailFilter] = useState<'all' | 'session' | 'mentorship' | 'coach'>('all');
   const [emailSearchQuery, setEmailSearchQuery] = useState('');
 
+  /**
+   * Synchronizes applications and registrations from central Google Cloud in real time
+   */
+  const syncWithCloud = async (silent = false) => {
+    if (!silent) setIsCloudSyncing(true);
+    setCloudSyncError(null);
+    try {
+      const result = await fetchCloudAdminData();
+      if (result.success) {
+        // 1. Merge Wednesday Attendee Registrations
+        if (result.registrations && result.registrations.length > 0) {
+          setAttendees(prev => {
+            const map = new Map<string, AttendeeRecord>();
+            prev.forEach(item => map.set(item.email.toLowerCase().trim(), item));
+            result.registrations.forEach(item => {
+              const emailKey = item.email.toLowerCase().trim();
+              const existing = map.get(emailKey);
+              if (existing) {
+                map.set(emailKey, {
+                  ...item,
+                  ...existing,
+                  attendanceEssay: item.attendanceEssay || existing.attendanceEssay
+                });
+              } else {
+                map.set(emailKey, item);
+              }
+            });
+            const merged = Array.from(map.values());
+            saveStoredRegistrations(merged);
+            return merged;
+          });
+        }
+
+        // 2. Merge 1-on-1 Mentorship Applications
+        if (result.mentorshipApplications && result.mentorshipApplications.length > 0) {
+          setMentorshipApps(prev => {
+            const map = new Map<string, MentorshipApplication>();
+            prev.forEach(item => map.set(item.id || item.email.toLowerCase().trim(), item));
+            result.mentorshipApplications.forEach(item => {
+              const key = item.id || item.email.toLowerCase().trim();
+              const existing = map.get(key);
+              if (existing) {
+                map.set(key, { ...item, ...existing });
+              } else {
+                map.set(key, item);
+              }
+            });
+            const merged = Array.from(map.values());
+            saveStoredMentorshipApplications(merged);
+            return merged;
+          });
+        }
+
+        // 3. Merge Alumni Coach Applications
+        if (result.coachApplications && result.coachApplications.length > 0) {
+          setAlumniCoachApps(prev => {
+            const map = new Map<string, AlumniCoachApplication>();
+            prev.forEach(item => map.set(item.id || item.email.toLowerCase().trim(), item));
+            result.coachApplications.forEach(item => {
+              const key = item.id || item.email.toLowerCase().trim();
+              const existing = map.get(key);
+              if (existing) {
+                map.set(key, { ...item, ...existing });
+              } else {
+                map.set(key, item);
+              }
+            });
+            const merged = Array.from(map.values());
+            saveStoredAlumniCoachApplications(merged);
+            return merged;
+          });
+        }
+
+        setLastCloudSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } else if (result.error) {
+        setCloudSyncError(result.error);
+      }
+    } catch (err: any) {
+      console.warn('Real-time cloud sync notice:', err);
+      setCloudSyncError(err?.message || 'Sync encountered notice');
+    } finally {
+      if (!silent) setIsCloudSyncing(false);
+    }
+  };
+
   useEffect(() => {
     const sessionAuth = sessionStorage.getItem('cih_admin_auth');
     if (sessionAuth === 'true') {
@@ -174,6 +268,17 @@ export const AdminPage: React.FC = () => {
     setAdminConfig(getAdminConfig());
     setSentEmails(getStoredSentEmails());
   }, []);
+
+  // Live Auto-Polling every 25 seconds across all devices
+  useEffect(() => {
+    if (isAuthenticated) {
+      syncWithCloud(true);
+      const interval = setInterval(() => {
+        syncWithCloud(true);
+      }, 25000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -340,6 +445,9 @@ export const AdminPage: React.FC = () => {
       }
       setTimeout(() => setSentEmails(getStoredSentEmails()), 200);
     }
+
+    // Sync status change to Google Cloud in real time
+    updateCloudRecordStatus('mentorship', appId, status);
   };
 
   // Export Mentorship to CSV (Item 14)
@@ -489,6 +597,9 @@ export const AdminPage: React.FC = () => {
       }
       setTimeout(() => setSentEmails(getStoredSentEmails()), 200);
     }
+
+    // Sync coach status change to Google Cloud in real time
+    updateCloudRecordStatus('coach', appId, newStatus);
   };
 
   // Attendee Selection & Acceptance Handler (Item 4, 8, 12: Generates ticket, schedules Tuesday dispatch)
@@ -553,6 +664,9 @@ export const AdminPage: React.FC = () => {
       console.warn('Session acceptance email notice:', mailErr);
     }
 
+    // Sync selection status to Google Cloud in real time
+    updateCloudRecordStatus('attendee', attendee.email, 'accepted');
+
     alert(`Candidate "${attendee.fullName}" has been ACCEPTED! Official admission email & pass dispatched to ${attendee.email}.`);
   };
 
@@ -582,6 +696,11 @@ export const AdminPage: React.FC = () => {
       } catch (mailErr) {
         console.warn('Session decline email notice:', mailErr);
       }
+    }
+
+    // Sync decline status to Google Cloud in real time
+    if (target?.email) {
+      updateCloudRecordStatus('attendee', target.email, 'declined');
     }
 
     alert(`Candidate application marked as DECLINED. Instant notification email dispatched to ${target?.email || 'applicant'}.`);
@@ -831,7 +950,27 @@ export const AdminPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Real-time Cloud Sync across any device */}
+            <button
+              onClick={() => syncWithCloud(false)}
+              disabled={isCloudSyncing}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl border shadow-xs transition-all active:scale-95 ${
+                isCloudSyncing
+                  ? 'bg-amber-50 text-amber-900 border-amber-300'
+                  : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+              }`}
+              title="Click to sync all new applications and registrations across any phone or laptop"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-700 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+              <span>{isCloudSyncing ? 'Syncing...' : 'Live Cloud Sync'}</span>
+              {lastCloudSyncTime && (
+                <span className="text-[10px] font-mono text-emerald-800 bg-emerald-200/60 px-1.5 py-0.5 rounded font-bold">
+                  {lastCloudSyncTime}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={handleLogout}
               className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:text-navy-900 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors"

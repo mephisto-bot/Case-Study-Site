@@ -1,4 +1,4 @@
-import { RegistrationFormData, AttendeeRecord } from '../types';
+import { RegistrationFormData, AttendeeRecord, MentorshipApplication, AlumniCoachApplication } from '../types';
 import { getAdminConfig, getStoredRegistrations, saveStoredRegistrations, getStoredUpcomingSession } from './storage';
 import { getRegistrationStatus } from '../utils/registrationTiming';
 import { getNextSessionTargetDate } from '../utils/dateHelpers';
@@ -162,4 +162,90 @@ export const getGoogleCalendarUrl = (title: string = "CIH Wednesday Case Study",
   const end = formatGCal(endWed);
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&location=${encodeURIComponent('Community Innovation Hub, Plot 104, 5th Avenue Abesan Estate, Ipaja, Lagos, Nigeria')}`;
+};
+
+export interface CloudAdminData {
+  success: boolean;
+  registrations: AttendeeRecord[];
+  mentorshipApplications: MentorshipApplication[];
+  coachApplications: AlumniCoachApplication[];
+  error?: string;
+}
+
+/**
+ * Fetches all real-time attendee registrations, mentorship applications,
+ * and alumni coach applications from the central Google Sheets backend.
+ */
+export const fetchCloudAdminData = async (): Promise<CloudAdminData> => {
+  const config = getAdminConfig();
+  if (!config.appsScriptUrl || !config.appsScriptUrl.trim().startsWith('http')) {
+    return {
+      success: false,
+      registrations: [],
+      mentorshipApplications: [],
+      coachApplications: [],
+      error: 'Google Apps Script URL is not configured.'
+    };
+  }
+
+  try {
+    const url = `${config.appsScriptUrl.trim()}?action=getAllAdminData&_t=${Date.now()}`;
+    const resp = await fetch(url, { method: 'GET' });
+    if (!resp.ok) {
+      throw new Error(`Server returned HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    return {
+      success: true,
+      registrations: Array.isArray(data.registrations) ? data.registrations : [],
+      mentorshipApplications: Array.isArray(data.mentorshipApplications) ? data.mentorshipApplications : [],
+      coachApplications: Array.isArray(data.coachApplications) ? data.coachApplications : []
+    };
+  } catch (err: any) {
+    console.warn('Real-time cloud admin data fetch notice:', err);
+    return {
+      success: false,
+      registrations: [],
+      mentorshipApplications: [],
+      coachApplications: [],
+      error: err?.message || 'Could not fetch cloud data'
+    };
+  }
+};
+
+/**
+ * Updates an applicant's status directly in the Google Sheet across all devices
+ */
+export const updateCloudRecordStatus = async (
+  type: 'mentorship' | 'coach' | 'attendee',
+  idOrEmail: string,
+  status: string
+): Promise<boolean> => {
+  const config = getAdminConfig();
+  if (!config.appsScriptUrl || !config.appsScriptUrl.trim().startsWith('http')) {
+    return false;
+  }
+
+  try {
+    let action = 'updateAttendeeStatus';
+    let payload: any = { action, email: idOrEmail, status };
+    if (type === 'mentorship') {
+      action = 'updateMentorshipStatus';
+      payload = { action, id: idOrEmail, status };
+    } else if (type === 'coach') {
+      action = 'updateCoachStatus';
+      payload = { action, id: idOrEmail, status };
+    }
+
+    await fetch(config.appsScriptUrl.trim(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors'
+    });
+    return true;
+  } catch (e) {
+    console.warn('Could not update cloud record status:', e);
+    return false;
+  }
 };

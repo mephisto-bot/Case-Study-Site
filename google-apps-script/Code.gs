@@ -164,6 +164,44 @@ function doPost(e) {
     const action = data.action || '';
 
     // =========================================================================
+    // 0. Real-Time Admin Data Retrieval (POST variant)
+    // =========================================================================
+    if (action === 'getAllAdminData') {
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          status: 'success',
+          registrations: getRegistrationsFromSheet(),
+          mentorshipApplications: getMentorshipApplicationsFromSheet(),
+          coachApplications: getCoachApplicationsFromSheet()
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // 0b. Status Updates across devices
+    // =========================================================================
+    if (action === 'updateMentorshipStatus') {
+      updateMentorshipStatusInSheet(data.id, data.status);
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'Mentorship status updated in Google Sheet.' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'updateCoachStatus') {
+      updateCoachStatusInSheet(data.id, data.status);
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'Coach status updated in Google Sheet.' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'updateAttendeeStatus') {
+      updateAttendeeStatusInSheet(data.email || data.id, data.status);
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'Attendee status updated in Google Sheet.' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
     // 1. Mentorship Student Application
     // =========================================================================
     if (action === 'submitMentorship') {
@@ -184,28 +222,57 @@ function doPost(e) {
     }
 
     // =========================================================================
-    // 3. Outgoing Notification Email Dispatch
+    // 3. Outgoing Notification Email Dispatch (Selection, Mentorship, Coaches)
     // =========================================================================
     if (action === 'sendNotificationEmail') {
       const toEmail = (data.toEmail || '').trim().toLowerCase();
       const subject = data.subject || 'CIH Notification';
       const htmlBody = data.htmlBody || '';
       const plainText = data.plainText || '';
-      if (toEmail && htmlBody) {
+      let emailDispatched = false;
+      let emailError = '';
+
+      if (toEmail && (htmlBody || plainText)) {
+        // Try GmailApp first for highest deliverability & inbox placement
         try {
-          MailApp.sendEmail({
-            to: toEmail,
-            subject: subject,
+          GmailApp.sendEmail(toEmail, subject, plainText, {
             htmlBody: htmlBody,
-            body: plainText,
-            name: 'Community Innovation Hub'
+            name: 'Community Innovation Hub (CIH)'
           });
-        } catch (mailErr) {
-          Logger.log('Notification email dispatch notice: ' + mailErr.toString());
+          emailDispatched = true;
+        } catch (gErr) {
+          Logger.log('GmailApp send notice: ' + gErr.toString());
+          emailError = gErr.toString();
+          // Fallback to MailApp
+          try {
+            MailApp.sendEmail({
+              to: toEmail,
+              subject: subject,
+              htmlBody: htmlBody,
+              body: plainText,
+              name: 'Community Innovation Hub (CIH)'
+            });
+            emailDispatched = true;
+          } catch (mErr) {
+            Logger.log('MailApp fallback error: ' + mErr.toString());
+            emailError += ' | ' + mErr.toString();
+          }
+        }
+
+        // Record outgoing email log in Google Sheet for instant organizer auditing
+        try {
+          recordEmailLogToSheet(toEmail, subject, data.category || 'Notification', emailDispatched ? 'Delivered' : 'Failed', emailError || 'Sent successfully');
+        } catch (lErr) {
+          Logger.log('Email log sheet write notice: ' + lErr.toString());
         }
       }
+
       return ContentService.createTextOutput(
-        JSON.stringify({ status: 'success', message: 'Notification email dispatched.' })
+        JSON.stringify({
+          status: emailDispatched ? 'success' : 'error',
+          emailSent: emailDispatched,
+          message: emailDispatched ? 'Notification email dispatched to ' + toEmail : emailError
+        })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -261,11 +328,54 @@ function doPost(e) {
 }
 
 /**
- * Handle GET requests for health check or verification
+ * Handle GET requests: real-time data sync across devices & health check
  */
 function doGet(e) {
   const ss = getSpreadsheet();
   const session = getSessionDetails();
+  const action = (e && e.parameter && e.parameter.action) || '';
+
+  // Return all live data across any device in real time
+  if (action === 'getAllAdminData') {
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        status: 'success',
+        spreadsheetConnected: ss ? true : false,
+        registrations: getRegistrationsFromSheet(),
+        mentorshipApplications: getMentorshipApplicationsFromSheet(),
+        coachApplications: getCoachApplicationsFromSheet(),
+        timestamp: new Date().toISOString()
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'getMentorship') {
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        status: 'success',
+        applications: getMentorshipApplicationsFromSheet()
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'getCoach') {
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        status: 'success',
+        applications: getCoachApplicationsFromSheet()
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'getRegistrations') {
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        status: 'success',
+        registrations: getRegistrationsFromSheet()
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService.createTextOutput(
     JSON.stringify({
       status: 'active',
@@ -276,6 +386,141 @@ function doGet(e) {
       timestamp: new Date().toISOString()
     })
   ).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Reader functions to fetch live data from Google Sheets in real-time
+ */
+function getRegistrationsFromSheet() {
+  const ss = getSpreadsheet();
+  if (!ss) return [];
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(8, sheet.getLastColumn())).getValues();
+  return rows.map(function(r, idx) {
+    const rawStatus = String(r[7] || 'pending').toLowerCase().trim();
+    let status = 'pending';
+    if (rawStatus === 'accepted' || rawStatus === 'selected') status = 'accepted';
+    else if (rawStatus === 'declined') status = 'declined';
+
+    return {
+      id: 'reg-' + idx + '-' + (r[2] ? String(r[2]).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) : idx),
+      fullName: String(r[1] || '').trim(),
+      email: String(r[2] || '').trim().toLowerCase(),
+      phone: String(r[3] || '').trim(),
+      attendeeType: String(r[4] || 'GUEST').trim(),
+      attendanceEssay: String(r[5] || '').trim(),
+      timestamp: r[0] ? (r[0] instanceof Date ? r[0].toISOString() : String(r[0])) : new Date().toISOString(),
+      status: status,
+      selectedForSession: status === 'accepted',
+      ticketIssued: status === 'accepted',
+      syncedToGoogleSheets: true
+    };
+  }).filter(function(item) { return Boolean(item.email); });
+}
+
+function getMentorshipApplicationsFromSheet() {
+  const ss = getSpreadsheet();
+  if (!ss) return [];
+  const sheet = ss.getSheetByName('MentorshipApplications');
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(10, sheet.getLastColumn())).getValues();
+  return rows.map(function(r, idx) {
+    const dates = String(r[8] || '').split(' to ');
+    const rawStatus = String(r[9] || 'pending').toLowerCase().trim();
+    let status = 'pending';
+    if (rawStatus === 'accepted' || rawStatus === 'approved') status = 'accepted';
+    else if (rawStatus === 'declined') status = 'declined';
+    else if (rawStatus === 'reviewed') status = 'reviewed';
+
+    return {
+      id: String(r[1] || ('ment-' + idx)).trim(),
+      fullName: String(r[2] || '').trim(),
+      email: String(r[3] || '').trim().toLowerCase(),
+      phone: String(r[4] || '').trim(),
+      focusArea: String(r[5] || '').trim(),
+      desiredMentor: String(r[6] || '').trim(),
+      reasonNeeded: String(r[7] || '').trim(),
+      cohortStartDate: dates[0] ? dates[0].trim() : undefined,
+      cohortEndDate: dates[1] ? dates[1].trim() : undefined,
+      status: status,
+      createdAt: r[0] ? (r[0] instanceof Date ? r[0].toISOString() : String(r[0])) : new Date().toISOString()
+    };
+  }).filter(function(item) { return Boolean(item.email); });
+}
+
+function getCoachApplicationsFromSheet() {
+  const ss = getSpreadsheet();
+  if (!ss) return [];
+  const sheet = ss.getSheetByName('CoachApplications');
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(14, sheet.getLastColumn())).getValues();
+  return rows.map(function(r, idx) {
+    const rawStatus = String(r[13] || 'pending').toLowerCase().trim();
+    let status = 'pending';
+    if (rawStatus === 'accepted' || rawStatus === 'approved') status = 'accepted';
+    else if (rawStatus === 'declined') status = 'declined';
+    else if (rawStatus === 'reviewed') status = 'reviewed';
+
+    return {
+      id: String(r[1] || ('coach-' + idx)).trim(),
+      fullName: String(r[2] || '').trim(),
+      email: String(r[3] || '').trim().toLowerCase(),
+      phone: String(r[4] || '').trim(),
+      alumniTrack: String(r[5] || 'CIH Graduate / Alumni').trim(),
+      graduationYear: String(r[6] || '').trim(),
+      currentRole: String(r[7] || '').trim(),
+      organization: String(r[8] || '').trim(),
+      linkedinUrl: String(r[9] || '').trim(),
+      coachingDomain: String(r[10] || '').trim(),
+      availability: String(r[11] || 'Both On-site & Virtual').trim(),
+      statementOfPurpose: String(r[12] || '').trim(),
+      status: status,
+      createdAt: r[0] ? (r[0] instanceof Date ? r[0].toISOString() : String(r[0])) : new Date().toISOString()
+    };
+  }).filter(function(item) { return Boolean(item.email); });
+}
+
+function updateMentorshipStatusInSheet(id, status) {
+  const ss = getSpreadsheet();
+  if (!ss) return;
+  const sheet = ss.getSheetByName('MentorshipApplications');
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const ids = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === String(id).trim()) {
+      sheet.getRange(i + 2, 10).setValue(status);
+      return;
+    }
+  }
+}
+
+function updateCoachStatusInSheet(id, status) {
+  const ss = getSpreadsheet();
+  if (!ss) return;
+  const sheet = ss.getSheetByName('CoachApplications');
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const ids = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === String(id).trim()) {
+      sheet.getRange(i + 2, 14).setValue(status);
+      return;
+    }
+  }
+}
+
+function updateAttendeeStatusInSheet(emailOrId, status) {
+  const ss = getSpreadsheet();
+  if (!ss) return;
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const emails = sheet.getRange(2, 3, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < emails.length; i++) {
+    if (String(emails[i][0]).trim().toLowerCase() === String(emailOrId).trim().toLowerCase()) {
+      sheet.getRange(i + 2, 8).setValue(status);
+      return;
+    }
+  }
 }
 
 /**
@@ -623,3 +868,22 @@ function sendConfirmationEmail(fullName, email, attendeeType, session, ticketIma
     GmailApp.sendEmail(email, EMAIL_SUBJECT, plainTextFallback, gmailOptions);
   }
 }
+
+/**
+ * Helper to record email dispatch logs to 'EmailLogs' tab
+ */
+function recordEmailLogToSheet(recipient, subject, category, status, details) {
+  const ss = getSpreadsheet();
+  if (!ss) return;
+  const LOG_SHEET = 'EmailLogs';
+  let sheet = ss.getSheetByName(LOG_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(LOG_SHEET);
+    sheet.appendRow(['Timestamp (WAT)', 'Recipient Email', 'Email Subject', 'Category', 'Status', 'Technical Details']);
+    sheet.getRange('A1:F1').setFontWeight('bold').setBackground('#0F172A').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+  }
+  const dateFormatted = Utilities.formatDate(new Date(), 'GMT+1', 'yyyy-MM-dd HH:mm:ss');
+  sheet.appendRow([dateFormatted, recipient, subject, category, status, details || 'OK']);
+}
+
