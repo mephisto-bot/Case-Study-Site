@@ -5,6 +5,7 @@ import {
   saveStoredAuthUser, 
   getStoredUsers, 
   saveStoredUsers,
+  getStoredAlumniCoachApplications,
   saveRememberedAccount,
   setLastLoginEmail
 } from '../services/storage';
@@ -42,7 +43,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initial sync
     const saved = getStoredAuthUser();
     if (saved) {
-      setUser(saved);
+      // Check if user has an accepted coach application from cloud / local storage
+      const storedCoaches = getStoredAlumniCoachApplications();
+      const isAcceptedCoach = storedCoaches.some(
+        (c) =>
+          c.status === 'accepted' &&
+          ((c.email && saved.email && c.email.toLowerCase().trim() === saved.email.toLowerCase().trim()) ||
+            (c.fullName && saved.fullName && c.fullName.toLowerCase().trim() === saved.fullName.toLowerCase().trim()))
+      );
+      if (isAcceptedCoach && (!saved.isApprovedMentor || saved.mentorRole !== 'Coach')) {
+        const elevated: AuthUser = {
+          ...saved,
+          isApprovedMentor: true,
+          mentorRole: 'Coach',
+          isMentorVolunteer: true,
+          role: 'alumni'
+        };
+        setUser(elevated);
+        saveStoredAuthUser(elevated);
+      } else {
+        setUser(saved);
+      }
     } else {
       // Pop up immediately after loading website if not logged in
       const timer = setTimeout(() => {
@@ -78,8 +99,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const allUsers = getStoredUsers();
     const foundUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
 
+    // Check if this email corresponds to an approved alumni coach anywhere in the world
+    const storedCoaches = getStoredAlumniCoachApplications();
+    const matchingCoach = storedCoaches.find(
+      (c) =>
+        c.status === 'accepted' &&
+        c.email &&
+        c.email.toLowerCase().trim() === cleanEmail
+    );
+
     if (!foundUser) {
-      // If user doesn't exist yet, we can create a guest account on the fly or prompt
+      if (matchingCoach) {
+        // Automatically activate approved coach account
+        const autoCoachSession: AuthUser = {
+          id: matchingCoach.id || `usr-coach-${Date.now()}`,
+          fullName: matchingCoach.fullName,
+          email: matchingCoach.email,
+          phone: matchingCoach.phone,
+          role: 'alumni',
+          isAlumni: true,
+          isMentorVolunteer: true,
+          isApprovedMentor: true,
+          mentorRole: 'Coach',
+          mentorBio: matchingCoach.statementOfPurpose,
+          createdAt: new Date().toISOString()
+        };
+        saveStoredUsers([...allUsers, autoCoachSession]);
+        setUser(autoCoachSession);
+        saveStoredAuthUser(autoCoachSession);
+        saveRememberedAccount({
+          email: autoCoachSession.email,
+          fullName: autoCoachSession.fullName,
+          role: 'alumni'
+        });
+        setLastLoginEmail(autoCoachSession.email);
+        closeAuthModal();
+        return { success: true, message: `Welcome Coach ${autoCoachSession.fullName}! Your Certified Coach Desk is ready.` };
+      }
+
       return {
         success: false,
         message: 'No account found with this email. Please sign up or check your credentials.'
@@ -93,17 +150,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
+    const isCoachApproved = Boolean(foundUser.isApprovedMentor || matchingCoach);
+    const assignedMentorRole = isCoachApproved ? 'Coach' : foundUser.mentorRole;
+
     const authSession: AuthUser = {
       id: foundUser.id,
       fullName: foundUser.fullName,
       email: foundUser.email,
       phone: foundUser.phone,
-      role: foundUser.role,
-      isAlumni: foundUser.isAlumni,
+      role: isCoachApproved ? 'alumni' : foundUser.role,
+      isAlumni: isCoachApproved ? true : foundUser.isAlumni,
       alumniCohort: foundUser.alumniCohort,
-      isMentorVolunteer: foundUser.isMentorVolunteer,
+      isMentorVolunteer: isCoachApproved ? true : foundUser.isMentorVolunteer,
+      isApprovedMentor: isCoachApproved,
+      mentorRole: assignedMentorRole,
       mentorFocusAreas: foundUser.mentorFocusAreas,
-      mentorBio: foundUser.mentorBio,
+      mentorBio: foundUser.mentorBio || (matchingCoach ? matchingCoach.statementOfPurpose : undefined),
+      organization: foundUser.organization || (matchingCoach ? matchingCoach.organization : undefined),
+      linkedinUrl: foundUser.linkedinUrl || (matchingCoach ? matchingCoach.linkedinUrl : undefined),
+      githubUrl: foundUser.githubUrl,
+      skills: foundUser.skills,
+      sessionsAttended: foundUser.sessionsAttended,
+      bio: foundUser.bio,
       createdAt: foundUser.createdAt
     };
 
@@ -112,13 +180,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveRememberedAccount({
       email: foundUser.email,
       fullName: foundUser.fullName,
-      role: foundUser.role,
+      role: authSession.role,
       alumniCohort: foundUser.alumniCohort,
     });
     setLastLoginEmail(foundUser.email);
     closeAuthModal();
 
-    return { success: true, message: `Welcome back, ${foundUser.fullName}!` };
+    return { 
+      success: true, 
+      message: isCoachApproved 
+        ? `Welcome back, Coach ${foundUser.fullName}! Your Mentorship Desk is active.`
+        : `Welcome back, ${foundUser.fullName}!` 
+    };
   };
 
   const signup = async (data: SignUpFormData): Promise<{ success: boolean; message?: string }> => {

@@ -35,8 +35,11 @@ import {
   getStoredAlumniCoachApplications, 
   saveStoredAlumniCoachApplications, 
   getAdminConfig,
-  getStoredUsers
+  getStoredUsers,
+  saveStoredUsers,
+  saveStoredAuthUser
 } from '../services/storage';
+import { fetchCloudAdminData, updateCloudRecordStatus } from '../services/api';
 import { MentorshipApplication, AlumniCoachApplication } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { isValidGmail, GMAIL_ERROR_MESSAGE } from '../utils/validation';
@@ -102,16 +105,133 @@ export const AVAILABLE_MENTORS: CoachProfile[] = [
 ];
 
 export const MentorshipPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, openAuthModal, updateProfile } = useAuth();
 
   // Load stored applications
   const [mentorshipList, setMentorshipList] = useState<MentorshipApplication[]>([]);
   const [storedAlumniCoaches, setStoredAlumniCoaches] = useState<AlumniCoachApplication[]>([]);
+  const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
+  const [lastCloudSyncTime, setLastCloudSyncTime] = useState<string | null>(null);
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+
+  /**
+   * Synchronize coach approvals & mentee applications in real-time from Google Sheets
+   */
+  const syncMentorshipWithCloud = async (silent = false) => {
+    if (!silent) setIsSyncingCloud(true);
+    setCloudSyncError(null);
+    try {
+      const result = await fetchCloudAdminData();
+      if (result.success) {
+        // 1. Merge & Update Coach Applications across devices
+        if (result.coachApplications && result.coachApplications.length > 0) {
+          const existingCoaches = getStoredAlumniCoachApplications();
+          const coachMap = new Map<string, AlumniCoachApplication>();
+          existingCoaches.forEach(c => coachMap.set(c.id || c.email.toLowerCase().trim(), c));
+
+          result.coachApplications.forEach(c => {
+            const key = c.id || c.email.toLowerCase().trim();
+            const existing = coachMap.get(key);
+            const resolvedStatus = (c.status && c.status !== 'pending')
+              ? c.status
+              : (existing?.status || c.status || 'pending');
+            coachMap.set(key, { ...existing, ...c, status: resolvedStatus });
+          });
+
+          const mergedCoaches = Array.from(coachMap.values());
+          saveStoredAlumniCoachApplications(mergedCoaches);
+          const acceptedCoaches = mergedCoaches.filter(c => c.status === 'accepted');
+          setStoredAlumniCoaches(acceptedCoaches);
+
+          // Elevate current user if approved in cloud
+          if (user && user.email) {
+            const userEmail = user.email.toLowerCase().trim();
+            const userName = (user.fullName || '').toLowerCase().trim();
+            const matchingApprovedCoach = acceptedCoaches.find(c => 
+              (c.email && c.email.toLowerCase().trim() === userEmail) ||
+              (c.fullName && c.fullName.toLowerCase().trim() === userName)
+            );
+            if (matchingApprovedCoach && (!user.isApprovedMentor || user.mentorRole !== 'Coach')) {
+              const elevated = {
+                ...user,
+                isApprovedMentor: true,
+                mentorRole: 'Coach' as const,
+                role: 'alumni' as const,
+                mentorBio: matchingApprovedCoach.statementOfPurpose || user.mentorBio
+              };
+              saveStoredAuthUser(elevated);
+              updateProfile(elevated);
+
+              const allUsers = getStoredUsers();
+              const updatedAll = allUsers.map(u => 
+                (u.email && u.email.toLowerCase().trim() === userEmail)
+                  ? { ...u, isApprovedMentor: true, mentorRole: 'Coach' as const, role: 'alumni' as const }
+                  : u
+              );
+              saveStoredUsers(updatedAll);
+            }
+          }
+        }
+
+        // 2. Merge & Update Mentorship Student Applications in real time
+        if (result.mentorshipApplications && result.mentorshipApplications.length > 0) {
+          setMentorshipList(prev => {
+            const map = new Map<string, MentorshipApplication>();
+            prev.forEach(item => map.set(item.id || item.email.toLowerCase().trim(), item));
+
+            result.mentorshipApplications.forEach(item => {
+              const key = item.id || item.email.toLowerCase().trim();
+              const existing = map.get(key);
+              const resolvedStatus = (item.status && item.status !== 'pending')
+                ? item.status
+                : (existing?.status || item.status || 'pending');
+
+              if (existing) {
+                map.set(key, {
+                  ...existing,
+                  ...item,
+                  status: resolvedStatus,
+                  desiredMentor: item.desiredMentor || existing.desiredMentor,
+                  cohortStartDate: item.cohortStartDate || existing.cohortStartDate,
+                  cohortEndDate: item.cohortEndDate || existing.cohortEndDate
+                });
+              } else {
+                map.set(key, { ...item, status: resolvedStatus });
+              }
+            });
+
+            const merged = Array.from(map.values());
+            saveStoredMentorshipApplications(merged);
+            return merged;
+          });
+        }
+
+        setLastCloudSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } else if (result.error) {
+        setCloudSyncError(result.error);
+      }
+    } catch (err: any) {
+      console.warn('Mentorship real-time cloud sync notice:', err);
+      setCloudSyncError(err?.message || 'Sync encountered notice');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
 
   useEffect(() => {
     setMentorshipList(getStoredMentorshipApplications());
     setStoredAlumniCoaches(getStoredAlumniCoachApplications().filter(a => a.status === 'accepted'));
-  }, []);
+
+    // Trigger cloud sync immediately
+    syncMentorshipWithCloud(true);
+
+    // Auto-polling every 25 seconds for cross-device real-time sync
+    const interval = setInterval(() => {
+      syncMentorshipWithCloud(true);
+    }, 25000);
+
+    return () => clearInterval(interval);
+  }, [user?.email]);
 
   // Verification logic: Check if viewer is an accepted mentor / verified coach
   const isApprovedAlumniCoach = Boolean(
@@ -269,6 +389,11 @@ export const MentorshipPage: React.FC = () => {
         sendMenteeDeclinedEmail(target, activeCoachName);
       }
     }
+
+    // Sync status change directly to Google Sheets central cloud in real time
+    updateCloudRecordStatus('mentorship', appId, newStatus, {
+      assignedCoach: newStatus === 'accepted' ? `Coach ${activeCoachName}` : undefined
+    });
 
     setStatusFeedback(
       newStatus === 'accepted' 
@@ -541,6 +666,20 @@ export const MentorshipPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3 pt-2 md:pt-0">
               <button
                 type="button"
+                onClick={() => syncMentorshipWithCloud(false)}
+                disabled={isSyncingCloud}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-300 text-xs font-bold border border-emerald-500/30 transition-all flex items-center gap-2 shadow-sm"
+                title="Sync real-time applications directly from central Google Cloud backend"
+              >
+                <RefreshCw className={`w-4 h-4 ${isSyncingCloud ? 'animate-spin text-emerald-400' : 'text-emerald-300'}`} />
+                <span>{isSyncingCloud ? 'Syncing...' : 'Live Cloud Sync'}</span>
+                {lastCloudSyncTime && (
+                  <span className="text-[10px] text-emerald-200/80 font-normal">({lastCloudSyncTime})</span>
+                )}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setCoachViewMode('public-preview')}
                 className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all flex items-center gap-2 shadow-sm"
                 title="Preview what students and visitors see"
@@ -722,28 +861,42 @@ export const MentorshipPage: React.FC = () => {
           {/* Mentee Applicant Cards Roster */}
           <div className="space-y-6">
             {filteredCoachApplicants.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm space-y-4">
+              <div className="bg-white rounded-3xl p-10 sm:p-14 text-center border border-slate-200 shadow-sm space-y-5">
                 <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
                   <Users className="w-8 h-8" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-navy-900">No Applications Found in this Filter</h3>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-navy-900">No Applications Found in this Filter</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto leading-relaxed">
                     {coachQueueTab === 'direct'
-                      ? `No student applications have directly selected Coach ${activeCoachName} with this status. Check the "Open Pool" tab to review candidates seeking an available coach!`
-                      : `No candidate applications currently match your selected status filter.`}
+                      ? `No student applications have directly selected Coach ${activeCoachName} with this status. Check the Open Pool tab to review students waiting for an available coach!`
+                      : `No candidate applications currently match your selected status filter in this tab.`}
                   </p>
                 </div>
-                {coachQueueTab === 'direct' && autoMatchApplicants.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  {coachQueueTab === 'direct' && autoMatchApplicants.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCoachQueueTab('auto-match');
+                        setCoachStatusFilter('all');
+                      }}
+                      className="px-6 py-3 rounded-2xl bg-brand-orange text-white text-xs sm:text-sm font-extrabold shadow-lg hover:bg-brand-orange-hover transition-all inline-flex items-center gap-2"
+                    >
+                      <Target className="w-4 h-4" />
+                      <span>Switch to Open Pool ({autoMatchApplicants.length} Available Students)</span>
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setCoachQueueTab('auto-match')}
-                    className="px-5 py-2.5 rounded-xl bg-brand-orange text-white text-xs font-bold shadow hover:bg-brand-orange-hover transition-all inline-flex items-center gap-2"
+                    onClick={() => syncMentorshipWithCloud(false)}
+                    disabled={isSyncingCloud}
+                    className="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all inline-flex items-center gap-2 border border-slate-200"
                   >
-                    <Target className="w-4 h-4" />
-                    <span>View Open Mentee Pool ({autoMatchApplicants.length})</span>
+                    <RefreshCw className={`w-4 h-4 ${isSyncingCloud ? 'animate-spin text-brand-orange' : 'text-slate-500'}`} />
+                    <span>{isSyncingCloud ? 'Connecting to Cloud...' : 'Refresh from Google Sheets'}</span>
                   </button>
-                )}
+                </div>
               </div>
             ) : (
               filteredCoachApplicants.map((app) => {
@@ -975,6 +1128,28 @@ export const MentorshipPage: React.FC = () => {
   // =========================================================================
   return (
     <div className="min-h-screen bg-white pb-20">
+      {/* Coach Portal Access Banner for Certified Mentors */}
+      {!isCertifiedMentor && (
+        <div className="bg-navy-950 text-white px-4 py-3 text-xs border-b border-navy-800 shadow-inner">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 text-brand-orange shrink-0" />
+              <span className="text-slate-300">
+                Are you an approved CIH Coach or Mentor? Access your Coach Desk from any device anywhere in the world.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => openAuthModal('login')}
+              className="px-4 py-1.5 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white font-bold transition-all flex items-center gap-1.5 shadow-sm shrink-0"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Coach Desk Sign In</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Floating Return Button if a Coach is previewing public view */}
       {isCertifiedMentor && (
         <div className="fixed bottom-6 right-6 z-50 animate-bounce">

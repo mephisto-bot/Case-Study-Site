@@ -181,14 +181,14 @@ function doPost(e) {
     // 0b. Status Updates across devices
     // =========================================================================
     if (action === 'updateMentorshipStatus') {
-      updateMentorshipStatusInSheet(data.id, data.status);
+      updateMentorshipStatusInSheet(data.id || data.email, data.status, data.assignedCoach);
       return ContentService.createTextOutput(
         JSON.stringify({ status: 'success', message: 'Mentorship status updated in Google Sheet.' })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
     if (action === 'updateCoachStatus') {
-      updateCoachStatusInSheet(data.id, data.status);
+      updateCoachStatusInSheet(data.id || data.email, data.status);
       return ContentService.createTextOutput(
         JSON.stringify({ status: 'success', message: 'Coach status updated in Google Sheet.' })
       ).setMimeType(ContentService.MimeType.JSON);
@@ -481,28 +481,41 @@ function getCoachApplicationsFromSheet() {
   }).filter(function(item) { return Boolean(item.email); });
 }
 
-function updateMentorshipStatusInSheet(id, status) {
+function updateMentorshipStatusInSheet(idOrEmail, status, assignedCoach) {
   const ss = getSpreadsheet();
   if (!ss) return;
   const sheet = ss.getSheetByName('MentorshipApplications');
   if (!sheet || sheet.getLastRow() <= 1) return;
-  const ids = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
-  for (let i = 0; i < ids.length; i++) {
-    if (String(ids[i][0]).trim() === String(id).trim()) {
+  const target = String(idOrEmail || '').trim().toLowerCase();
+  if (!target) return;
+  const data = sheet.getRange(2, 2, sheet.getLastRow() - 1, 3).getValues(); // col 2 (ID), col 3 (Name), col 4 (Email)
+  for (let i = 0; i < data.length; i++) {
+    const rowId = String(data[i][0] || '').trim().toLowerCase();
+    const rowName = String(data[i][1] || '').trim().toLowerCase();
+    const rowEmail = String(data[i][2] || '').trim().toLowerCase();
+    if (rowId === target || (rowEmail && rowEmail === target) || (rowName && rowName === target)) {
       sheet.getRange(i + 2, 10).setValue(status);
+      if (assignedCoach && status === 'accepted') {
+        sheet.getRange(i + 2, 7).setValue(assignedCoach);
+      }
       return;
     }
   }
 }
 
-function updateCoachStatusInSheet(id, status) {
+function updateCoachStatusInSheet(idOrEmail, status) {
   const ss = getSpreadsheet();
   if (!ss) return;
   const sheet = ss.getSheetByName('CoachApplications');
   if (!sheet || sheet.getLastRow() <= 1) return;
-  const ids = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
-  for (let i = 0; i < ids.length; i++) {
-    if (String(ids[i][0]).trim() === String(id).trim()) {
+  const target = String(idOrEmail || '').trim().toLowerCase();
+  if (!target) return;
+  const data = sheet.getRange(2, 2, sheet.getLastRow() - 1, 3).getValues(); // col 2 (ID), col 3 (Name), col 4 (Email)
+  for (let i = 0; i < data.length; i++) {
+    const rowId = String(data[i][0] || '').trim().toLowerCase();
+    const rowName = String(data[i][1] || '').trim().toLowerCase();
+    const rowEmail = String(data[i][2] || '').trim().toLowerCase();
+    if (rowId === target || (rowEmail && rowEmail === target) || (rowName && rowName === target)) {
       sheet.getRange(i + 2, 14).setValue(status);
       return;
     }

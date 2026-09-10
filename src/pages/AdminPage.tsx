@@ -184,10 +184,16 @@ export const AdminPage: React.FC = () => {
             result.registrations.forEach(item => {
               const emailKey = item.email.toLowerCase().trim();
               const existing = map.get(emailKey);
+              const resolvedStatus = (item.status && item.status !== 'pending')
+                ? item.status
+                : (existing?.status || item.status || 'pending');
               if (existing) {
                 map.set(emailKey, {
-                  ...item,
                   ...existing,
+                  ...item,
+                  status: resolvedStatus,
+                  selectedForSession: resolvedStatus === 'accepted',
+                  ticketIssued: resolvedStatus === 'accepted' || existing.ticketIssued,
                   attendanceEssay: item.attendanceEssay || existing.attendanceEssay
                 });
               } else {
@@ -208,10 +214,20 @@ export const AdminPage: React.FC = () => {
             result.mentorshipApplications.forEach(item => {
               const key = item.id || item.email.toLowerCase().trim();
               const existing = map.get(key);
+              const resolvedStatus = (item.status && item.status !== 'pending')
+                ? item.status
+                : (existing?.status || item.status || 'pending');
               if (existing) {
-                map.set(key, { ...item, ...existing });
+                map.set(key, {
+                  ...existing,
+                  ...item,
+                  status: resolvedStatus,
+                  desiredMentor: item.desiredMentor || existing.desiredMentor,
+                  cohortStartDate: item.cohortStartDate || existing.cohortStartDate,
+                  cohortEndDate: item.cohortEndDate || existing.cohortEndDate
+                });
               } else {
-                map.set(key, item);
+                map.set(key, { ...item, status: resolvedStatus });
               }
             });
             const merged = Array.from(map.values());
@@ -228,10 +244,17 @@ export const AdminPage: React.FC = () => {
             result.coachApplications.forEach(item => {
               const key = item.id || item.email.toLowerCase().trim();
               const existing = map.get(key);
+              const resolvedStatus = (item.status && item.status !== 'pending')
+                ? item.status
+                : (existing?.status || item.status || 'pending');
               if (existing) {
-                map.set(key, { ...item, ...existing });
+                map.set(key, {
+                  ...existing,
+                  ...item,
+                  status: resolvedStatus
+                });
               } else {
-                map.set(key, item);
+                map.set(key, { ...item, status: resolvedStatus });
               }
             });
             const merged = Array.from(map.values());

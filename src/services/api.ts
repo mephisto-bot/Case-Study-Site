@@ -219,7 +219,8 @@ export const fetchCloudAdminData = async (): Promise<CloudAdminData> => {
 export const updateCloudRecordStatus = async (
   type: 'mentorship' | 'coach' | 'attendee',
   idOrEmail: string,
-  status: string
+  status: string,
+  extra?: { assignedCoach?: string }
 ): Promise<boolean> => {
   const config = getAdminConfig();
   if (!config.appsScriptUrl || !config.appsScriptUrl.trim().startsWith('http')) {
@@ -231,7 +232,7 @@ export const updateCloudRecordStatus = async (
     let payload: any = { action, email: idOrEmail, status };
     if (type === 'mentorship') {
       action = 'updateMentorshipStatus';
-      payload = { action, id: idOrEmail, status };
+      payload = { action, id: idOrEmail, status, assignedCoach: extra?.assignedCoach };
     } else if (type === 'coach') {
       action = 'updateCoachStatus';
       payload = { action, id: idOrEmail, status };
