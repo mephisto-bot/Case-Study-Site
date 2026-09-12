@@ -362,13 +362,10 @@ export const RegisterPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="pt-2 border-t border-slate-100">
-              <button
-                onClick={handleReset}
-                className="text-xs font-semibold text-slate-500 hover:text-navy-900 transition-colors"
-              >
-                ← Register another attendee
-              </button>
+            <div className="pt-3 border-t border-slate-100 text-center">
+              <p className="text-xs font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/20 rounded-xl py-2.5 px-3">
+                ✓ Seat Registration Received • We will get back to you soon and your application will be reviewed
+              </p>
             </div>
           </div>
         ) : (

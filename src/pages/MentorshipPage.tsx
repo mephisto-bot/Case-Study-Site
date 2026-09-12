@@ -1384,23 +1384,9 @@ export const MentorshipPage: React.FC = () => {
                       </div>
 
                       <div className="pt-4 flex justify-center">
-                        <button
-                          onClick={() => {
-                            setSubmitted(false);
-                            setFormData({
-                              fullName: '',
-                              email: '',
-                              phone: '',
-                              focusArea: 'Career Growth & Tech Leadership',
-                              desiredMentor: 'Any Available CIH Coach (Automatic Match)',
-                              reasonNeeded: ''
-                            });
-                            setSelectedMentorId('auto-match');
-                          }}
-                          className="px-6 py-3 rounded-xl bg-navy-900 text-white text-sm font-bold hover:bg-navy-800 transition-colors"
-                        >
-                          Submit Another Application
-                        </button>
+                        <div className="px-6 py-3 rounded-xl bg-brand-orange/10 border border-brand-orange/30 text-brand-orange text-sm font-bold text-center">
+                          We will get back to you soon • Your application will be reviewed
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1638,27 +1624,9 @@ export const MentorshipPage: React.FC = () => {
                       </div>
 
                       <div className="pt-4 flex justify-center">
-                        <button
-                          onClick={() => {
-                            setAlumniSubmitted(false);
-                            setAlumniForm({
-                              fullName: user?.fullName || '',
-                              email: user?.email || '',
-                              phone: user?.phone || '',
-                              alumniTrack: 'CIH Graduate / Alumni',
-                              graduationYear: '2023',
-                              currentRole: '',
-                              organization: '',
-                              linkedinUrl: '',
-                              coachingDomain: 'Tech & AI / Technical Problem Solving',
-                              availability: 'Both On-site & Virtual',
-                              statementOfPurpose: ''
-                            });
-                          }}
-                          className="px-6 py-3 rounded-xl bg-navy-900 text-white text-sm font-bold hover:bg-navy-800 transition-colors"
-                        >
-                          Submit Another Coach Application
-                        </button>
+                        <div className="px-6 py-3 rounded-xl bg-brand-orange/10 border border-brand-orange/30 text-brand-orange text-sm font-bold text-center">
+                          We will get back to you soon • Your application will be reviewed
+                        </div>
                       </div>
                     </div>
                   ) : (
