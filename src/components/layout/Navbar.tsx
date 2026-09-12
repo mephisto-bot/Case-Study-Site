@@ -5,6 +5,7 @@ import { GlobalSearchModal } from '../common/GlobalSearchModal';
 import { useAuth } from '../../context/AuthContext';
 import { fetchCloudAdminData } from '../../services/api';
 import { UserProfileModal } from '../auth/UserProfileModal';
+import { AuthModal } from '../auth/AuthModal';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
