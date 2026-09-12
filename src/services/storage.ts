@@ -1,8 +1,8 @@
 import { CaseStudy, UpcomingSession, AttendeeRecord, CaseStudyFeedback, MentorshipApplication, AlumniCoachApplication, FAQItem, TopicSuggestion, AdminConfig, Testimonial, AuthUser, RememberedAccount, SentEmailLog } from '../types';
 import { initialCaseStudies, initialUpcomingSession, initialTestimonials } from '../data/initialData';
 
-const CASE_STUDIES_KEY = 'cih_case_studies_v2';
-const UPCOMING_SESSION_KEY = 'cih_upcoming_session_v2';
+const CASE_STUDIES_KEY = 'cih_case_studies_v3';
+const UPCOMING_SESSION_KEY = 'cih_upcoming_session_v3';
 const REGISTRATIONS_KEY = 'cih_registrations_v1';
 const ADMIN_CONFIG_KEY = 'cih_admin_config_v1';
 const FEEDBACK_KEY = 'cih_feedback_v2';
