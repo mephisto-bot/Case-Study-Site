@@ -32,7 +32,12 @@ export const HomePage: React.FC = () => {
   const [showAllResources, setShowAllResources] = useState(false);
   const [showAllHighlights, setShowAllHighlights] = useState(false);
 
-  const recentStudy = caseStudies[0] || null;
+  const sortedStudies = React.useMemo(() => {
+    return [...caseStudies].sort((a, b) => (b.weekNumber || 0) - (a.weekNumber || 0));
+  }, [caseStudies]);
+
+  const recentStudy = sortedStudies[0] || null;
+  const videoStudy = sortedStudies.find(c => c.videoUrl || c.youtubeUrl || c.youtubeVideoId) || recentStudy;
 
   // Highlights cards for home page
   const highlights = [
@@ -333,7 +338,7 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* 1.8 Featured Session Video Showcase */}
-      {recentStudy && (recentStudy.videoUrl || recentStudy.youtubeUrl || recentStudy.youtubeVideoId) && (
+      {videoStudy && (videoStudy.videoUrl || videoStudy.youtubeUrl || videoStudy.youtubeVideoId) && (
         <section className="py-10 sm:py-16 bg-navy-950 text-white border-b border-navy-800 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             <div className="lg:col-span-5 space-y-5">
@@ -343,11 +348,11 @@ export const HomePage: React.FC = () => {
               </div>
               
               <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                Watch "The Elevator Pitch" Session
+                {videoStudy.videoTitle || `Watch "${videoStudy.title}" Session`}
               </h2>
               
               <p className="text-xs sm:text-base text-slate-300 leading-relaxed">
-                Watch how Hub Interns and ITs delivered live elevator pitches on their internal projects under pressure, and experience the official presentation of the CIH Case Study digital platform.
+                {videoStudy.subtitle || videoStudy.excerpt}
               </p>
 
               <div className="space-y-2 text-xs sm:text-sm text-slate-200">
@@ -357,16 +362,16 @@ export const HomePage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-brand-orange" />
-                  <span>Trainee project presentations + CIH platform demonstration</span>
+                  <span>Live session presentation + peer Q&amp;A deliberations</span>
                 </div>
               </div>
 
               <div className="pt-2 flex flex-wrap items-center gap-3">
                 <button
-                  onClick={() => setSelectedStudy(recentStudy)}
+                  onClick={() => setSelectedStudy(videoStudy)}
                   className="px-6 py-3 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white text-xs sm:text-sm font-bold shadow-lg hover:shadow-orange-glow transition-all active:scale-95 flex items-center gap-2"
                 >
-                  <span>Explore Case Details & Photos</span>
+                  <span>Explore Case Details &amp; Photos</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <Link
@@ -380,11 +385,11 @@ export const HomePage: React.FC = () => {
 
             <div className="lg:col-span-7">
               <SessionVideoPlayer
-                videoUrl={recentStudy.videoUrl}
-                youtubeUrl={recentStudy.youtubeUrl}
-                youtubeVideoId={recentStudy.youtubeVideoId}
-                title={recentStudy.videoTitle || recentStudy.title}
-                posterUrl={recentStudy.imageUrl}
+                videoUrl={videoStudy.videoUrl}
+                youtubeUrl={videoStudy.youtubeUrl}
+                youtubeVideoId={videoStudy.youtubeVideoId}
+                title={videoStudy.videoTitle || videoStudy.title}
+                posterUrl={videoStudy.imageUrl}
               />
             </div>
           </div>

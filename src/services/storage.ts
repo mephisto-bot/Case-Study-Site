@@ -47,13 +47,16 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
       const existingIds = new Set(updated.map((s) => s.id));
       const newStudies = initialCaseStudies.filter((s) => !existingIds.has(s.id));
       const finalStudies = [...newStudies, ...updated];
+      finalStudies.sort((a, b) => (b.weekNumber || 0) - (a.weekNumber || 0));
       localStorage.setItem(CASE_STUDIES_KEY, JSON.stringify(finalStudies));
       return finalStudies;
     }
   } catch (err) {
     console.error('Error loading stored case studies', err);
   }
-  return initialCaseStudies;
+  const result = [...initialCaseStudies];
+  result.sort((a, b) => (b.weekNumber || 0) - (a.weekNumber || 0));
+  return result;
 };
 
 export const saveStoredCaseStudies = (studies: CaseStudy[]): void => {
