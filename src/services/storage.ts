@@ -38,6 +38,8 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
             youtubeUrl: init.youtubeUrl || study.youtubeUrl,
             youtubeVideoId: init.youtubeVideoId || study.youtubeVideoId,
             videoTitle: init.videoTitle || study.videoTitle,
+            slidesUrl: study.slidesUrl || init.slidesUrl,
+            slidesEmbedUrl: study.slidesEmbedUrl || init.slidesEmbedUrl,
           };
         }
         return study;

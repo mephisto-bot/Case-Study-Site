@@ -37,10 +37,12 @@ import {
   getAdminConfig,
   getStoredUsers,
   saveStoredUsers,
-  saveStoredAuthUser
+  saveStoredAuthUser,
+  getStoredCaseStudies,
+  saveStoredCaseStudies
 } from '../services/storage';
 import { fetchCloudAdminData, updateCloudRecordStatus } from '../services/api';
-import { MentorshipApplication, AlumniCoachApplication } from '../types';
+import { MentorshipApplication, AlumniCoachApplication, CaseStudy } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { isValidGmail, GMAIL_ERROR_MESSAGE } from '../utils/validation';
 import { COACH_IMAGES, getCoachImage } from '../data/coachImages';
@@ -1074,6 +1076,9 @@ export const MentorshipPage: React.FC = () => {
             )}
           </div>
 
+          {/* Mentor Presentation Slides Upload Section */}
+          <MentorSlideUploader />
+
           {/* Simulation & Testing Footer Toolbar */}
           <div className="p-4 rounded-2xl bg-navy-900 text-white text-xs flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
             <div className="flex items-center gap-2">
@@ -1884,6 +1889,108 @@ export const MentorshipPage: React.FC = () => {
           </div>
         </div>
       </section>
+    </div>
+  );
+};
+
+// Subcomponent for Mentors & Coaches to attach/upload slides to any case study
+const MentorSlideUploader: React.FC = () => {
+  const [studies, setStudies] = useState<CaseStudy[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [slidesUrlInput, setSlidesUrlInput] = useState<string>('');
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+
+  useEffect(() => {
+    const loaded = getStoredCaseStudies();
+    setStudies(loaded);
+    if (loaded.length > 0) {
+      setSelectedId(loaded[0].id);
+      setSlidesUrlInput(loaded[0].slidesUrl || '');
+    }
+  }, []);
+
+  const handleSelectChange = (id: string) => {
+    setSelectedId(id);
+    const found = studies.find(s => s.id === id);
+    setSlidesUrlInput(found?.slidesUrl || '');
+  };
+
+  const handleSaveSlides = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) return;
+
+    const updated = studies.map(s => {
+      if (s.id === selectedId) {
+        return {
+          ...s,
+          slidesUrl: slidesUrlInput.trim()
+        };
+      }
+      return s;
+    });
+
+    setStudies(updated);
+    saveStoredCaseStudies(updated);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  return (
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md space-y-4">
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+        <div className="w-10 h-10 rounded-xl bg-brand-orange/10 text-brand-orange flex items-center justify-center font-bold">
+          <FileText className="w-5 h-5" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-navy-900">Upload / Attach Case Study Presentation Slides</h3>
+          <p className="text-xs text-slate-500">Hub Mentors & Coaches can attach Google Slides or PDF links directly to any session.</p>
+        </div>
+      </div>
+
+      {saveSuccess && (
+        <div className="p-3 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>Session presentation slides published successfully! Live in case study modal.</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSaveSlides} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Select Case Study Session</label>
+          <select
+            value={selectedId}
+            onChange={(e) => handleSelectChange(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-navy-900 focus:ring-2 focus:ring-brand-orange"
+          >
+            {studies.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.weekNumber ? `Week ${s.weekNumber} • ` : ''}{s.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Google Drive / Presentation Slides Link</label>
+          <input
+            type="url"
+            value={slidesUrlInput}
+            onChange={(e) => setSlidesUrlInput(e.target.value)}
+            placeholder="https://docs.google.com/presentation/d/..."
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs text-navy-900 focus:ring-2 focus:ring-brand-orange"
+          />
+        </div>
+
+        <div>
+          <button
+            type="submit"
+            className="w-full py-2.5 px-4 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-xl shadow transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Publish Slides to Website</span>
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

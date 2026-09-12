@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, CheckCircle, HelpCircle, ArrowRight, Share2, Tag, Image as ImageIcon } from 'lucide-react';
+import { X, Calendar, CheckCircle, HelpCircle, ArrowRight, Share2, Tag, Image as ImageIcon, FileText, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CaseStudy } from '../../types';
 import { SessionVideoPlayer } from './SessionVideoPlayer';
@@ -25,6 +25,21 @@ export const CaseStudyModal: React.FC<CaseStudyModalProps> = ({ study, onClose }
   const handleShare = () => {
     setIsShareModalOpen(true);
   };
+
+  const getSlidesEmbedUrl = (url: string) => {
+    if (!url) return '';
+    if (url.includes('docs.google.com/presentation') || url.includes('docs.google.com/document') || url.includes('drive.google.com')) {
+      if (url.includes('/edit')) return url.replace('/edit', '/embed');
+      if (url.includes('/view')) return url.replace('/view', '/preview');
+      if (!url.includes('/embed') && !url.includes('/preview')) {
+        return url.endsWith('/') ? `${url}preview` : `${url}/preview`;
+      }
+    }
+    return url;
+  };
+
+  const slidesTarget = study.slidesEmbedUrl || (study.slidesUrl ? getSlidesEmbedUrl(study.slidesUrl) : '');
+  const rawSlidesUrl = study.slidesUrl || study.slidesEmbedUrl || '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10 bg-navy-950/80 backdrop-blur-md overflow-y-auto animate-fade-in">
@@ -122,6 +137,43 @@ export const CaseStudyModal: React.FC<CaseStudyModalProps> = ({ study, onClose }
                 title={study.videoTitle || `${study.title} - Session Video`}
                 posterUrl={study.imageUrl}
               />
+            </div>
+          )}
+
+          {/* Official Session Presentation Slides (If available) */}
+          {rawSlidesUrl && (
+            <div className="space-y-3 p-5 rounded-2xl bg-slate-900 text-white shadow-md border border-slate-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-brand-orange/20 text-brand-orange flex items-center justify-center font-bold">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Official Session Presentation Slides</h4>
+                    <p className="text-xs text-slate-400">Uploaded by Hub Mentors & Presenters</p>
+                  </div>
+                </div>
+                <a
+                  href={rawSlidesUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold transition-all shadow active:scale-95"
+                >
+                  <span>Open Fullscreen</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+
+              {slidesTarget && (
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-slate-800 shadow-inner">
+                  <iframe
+                    src={slidesTarget}
+                    title={`${study.title} Presentation Slides`}
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                  />
+                </div>
+              )}
             </div>
           )}
 

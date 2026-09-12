@@ -118,7 +118,8 @@ export const AdminPage: React.FC = () => {
     keyTakeaways: [''],
     discussionQuestions: [''],
     featured: false,
-    videoUrl: ''
+    videoUrl: '',
+    slidesUrl: ''
   });
 
   // Upcoming Session State
@@ -384,6 +385,7 @@ export const AdminPage: React.FC = () => {
       youtubeUrl: newStudy.youtubeUrl || '',
       youtubeVideoId: newStudy.youtubeVideoId || '',
       videoTitle: newStudy.videoTitle || newStudy.title || '',
+      slidesUrl: newStudy.slidesUrl || '',
       excerpt: newStudy.excerpt,
       fullContent: newStudy.fullContent || newStudy.excerpt,
       keyTakeaways: (newStudy.keyTakeaways || []).filter(t => t && t.trim().length > 0),
@@ -406,6 +408,7 @@ export const AdminPage: React.FC = () => {
       videoUrl: '',
       youtubeUrl: '',
       videoTitle: '',
+      slidesUrl: '',
       excerpt: '',
       fullContent: '',
       keyTakeaways: [''],
@@ -1299,6 +1302,16 @@ export const AdminPage: React.FC = () => {
                       value={newStudy.youtubeUrl || ''}
                       onChange={(e) => setNewStudy({ ...newStudy, youtubeUrl: e.target.value })}
                       placeholder="https://www.youtube.com/watch?v=... or YouTube Video ID"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Session Slides Link (Google Drive / Slides Embed Link / PDF URL)</label>
+                    <input
+                      type="text"
+                      value={newStudy.slidesUrl || ''}
+                      onChange={(e) => setNewStudy({ ...newStudy, slidesUrl: e.target.value })}
+                      placeholder="https://docs.google.com/presentation/d/... or Google Drive share link"
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
                     />
                   </div>

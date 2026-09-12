@@ -2,7 +2,7 @@ import { CaseStudy, TopicModule, UpcomingSession, FAQItem, Testimonial } from '.
 import { getUpcomingWednesdayFormatted, getPastWednesdayStr } from '../utils/dateHelpers';
 
 export const initialUpcomingSession: UpcomingSession = {
-  weekTitle: "WEEK 19 • UPCOMING SESSION",
+  weekTitle: "WEEK 20 • UPCOMING SESSION",
   badgeText: "NEXT WEDNESDAY",
   topicTitle: "Mindset & Problem Framing",
   dateStr: getUpcomingWednesdayFormatted(),
@@ -15,12 +15,40 @@ export const initialUpcomingSession: UpcomingSession = {
 
 export const initialCaseStudies: CaseStudy[] = [
   {
+    id: "the-big-break",
+    title: "Case Study: THE BIG BREAK",
+    subtitle: "Goal Planning & Progressive Execution through 30-Day Action Blueprints",
+    sector: "Personal Growth & Productivity",
+    tagColor: "bg-purple-50 text-purple-700 border-purple-200",
+    date: getPastWednesdayStr(0),
+    weekNumber: 19,
+    imageUrl: "/images/cih-photo-1.jpg",
+    galleryImages: [
+      "/images/cih-photo-1.jpg",
+      "/images/cih-photo-2.jpg",
+      "/images/cih-photo-3.jpg"
+    ],
+    excerpt: "Dissecting how grand long-term goals can be broken down into manageable 30-day progressive execution sprints that yield tangible, step-by-step achievements.",
+    fullContent: "In this powerful case study session titled 'THE BIG BREAK', participants explored why traditional annual resolutions frequently fail and how structuring ambitious objectives into focused 30-day action plans creates sustainable momentum.\n\nThe session focused on practical goal decomposition: taking large, daunting milestones—such as launching a tech platform, mastering a complex domain, or transitioning careers—and breaking them into progressive 30-day phases with daily non-negotiable micro-habits and weekly retrospective audits. Mentors guided participants through real-world case scenarios demonstrating how consistency in small, deliberate steps compounds into groundbreaking results.",
+    keyTakeaways: [
+      "Goal Decomposition: Breaking massive annual ambitions into targeted 30-day progressive milestones.",
+      "The Power of Sprints: Utilizing weekly retrospective audits to adjust strategy without abandoning overarching goals.",
+      "Micro-Habit Stacking: Designing daily non-negotiable routines that eliminate friction and decision fatigue.",
+      "Accountability Frameworks: Partnering with mentors and peers to track execution metrics in real time."
+    ],
+    discussionQuestions: [
+      "Why do most individuals fail to sustain motivation past 30 days, and what systems prevent early drop-off?",
+      "How do you balance aggressive short-term 30-day targets with long-term strategic vision without suffering burnout?"
+    ],
+    featured: true
+  },
+  {
     id: "the-elevator-pitch",
     title: "Case Study: The Elevator Pitch",
     subtitle: "Internal projects showcase by Hub Interns & ITs, and the digital debut of the CIH Case Study platform",
     sector: "Communication & Media",
     tagColor: "bg-orange-50 text-brand-orange border-orange-200",
-    date: getPastWednesdayStr(0),
+    date: getPastWednesdayStr(1),
     weekNumber: 18,
     imageUrl: "/images/elevator-pitch-presenter.jpg",
     galleryImages: [

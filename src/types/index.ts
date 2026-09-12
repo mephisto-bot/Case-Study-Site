@@ -12,6 +12,8 @@ export interface CaseStudy {
   youtubeUrl?: string;
   youtubeVideoId?: string;
   videoTitle?: string;
+  slidesUrl?: string;
+  slidesEmbedUrl?: string;
   excerpt: string;
   fullContent?: string;
   keyTakeaways?: string[];
