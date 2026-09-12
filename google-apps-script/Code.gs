@@ -481,7 +481,7 @@ function getCoachApplicationsFromSheet() {
   }).filter(function(item) { return Boolean(item.email); });
 }
 
-function updateMentorshipStatusInSheet(idOrEmail, status, assignedCoach) {
+function updateMentorshipStatusInSheet(idOrEmail, status, assignedCoachEmail) {
   const ss = getSpreadsheet();
   if (!ss) return;
   const sheet = ss.getSheetByName('MentorshipApplications');
@@ -494,14 +494,35 @@ function updateMentorshipStatusInSheet(idOrEmail, status, assignedCoach) {
     const rowName = String(data[i][1] || '').trim().toLowerCase();
     const rowEmail = String(data[i][2] || '').trim().toLowerCase();
     if (rowId === target || (rowEmail && rowEmail === target) || (rowName && rowName === target)) {
+      // Update status
       sheet.getRange(i + 2, 10).setValue(status);
-      if (assignedCoach && status === 'accepted') {
-        sheet.getRange(i + 2, 7).setValue(assignedCoach);
+      // If assigning an accepted mentor, enforce limit of 3 mentees per coach (by email)
+      if (assignedCoachEmail && status === 'accepted') {
+        const coachEmail = String(assignedCoachEmail).trim().toLowerCase();
+        // Count current accepted mentees for this coach
+        const allRows = sheet.getRange(2, 7, sheet.getLastRow() - 1, 4).getValues(); // col7 = AssignedCoach, col10 = Status
+        let assignedCount = 0;
+        for (let r = 0; r < allRows.length; r++) {
+          const coachCol = String(allRows[r][0] || '').trim().toLowerCase();
+          const statusCol = String(allRows[r][3] || '').trim().toLowerCase();
+          if (coachCol === coachEmail && statusCol === 'accepted') {
+            assignedCount++;
+          }
+        }
+        if (assignedCount >= 3) {
+          // Exceeds limit, revert status and do not assign
+          sheet.getRange(i + 2, 10).setValue('pending');
+          Logger.log('Coach assignment limit reached for ' + coachEmail);
+        } else {
+          // Assign coach email
+          sheet.getRange(i + 2, 7).setValue(coachEmail);
+        }
       }
       return;
     }
   }
 }
+
 
 function updateCoachStatusInSheet(idOrEmail, status) {
   const ss = getSpreadsheet();
@@ -575,7 +596,9 @@ function recordAttendeeToSheet(fullName, email, phone, attendeeType, attendanceE
   }
 
   const dateFormatted = Utilities.formatDate(new Date(timestamp), 'GMT+1', 'yyyy-MM-dd HH:mm:ss');
-  sheet.appendRow([dateFormatted, fullName, email, phone, attendeeType, attendanceEssay, 'Yes', 'Registered']);
+  // Truncate essay to 300 words
+  const truncatedEssay = truncateWords(String(attendanceEssay || ''), 300);
+  sheet.appendRow([dateFormatted, fullName, email, phone, attendeeType, truncatedEssay, 'Yes', 'Registered']);
 }
 
 /**
@@ -609,8 +632,20 @@ function recordMentorshipToSheet(data) {
     sheet.setFrozenRows(1);
   }
 
+  // Duplicate check by email
+  const existingRows = sheet.getRange(2, 4, sheet.getLastRow() - 1, 1).getValues(); // Email column
+  const newEmail = String(data.email || '').trim().toLowerCase();
+  for (let i = 0; i < existingRows.length; i++) {
+    if (String(existingRows[i][0] || '').trim().toLowerCase() === newEmail) {
+      Logger.log('Duplicate mentorship application for email: ' + newEmail);
+      return; // silently ignore duplicate
+    }
+  }
+
   const dateFormatted = Utilities.formatDate(new Date(data.createdAt || new Date()), 'GMT+1', 'yyyy-MM-dd HH:mm:ss');
   const cohortDates = (data.cohortStartDate ? data.cohortStartDate.substring(0, 10) : '') + ' to ' + (data.cohortEndDate ? data.cohortEndDate.substring(0, 10) : '');
+  // Truncate essay to 300 words
+  const truncatedEssay = truncateWords(String(data.reasonNeeded || ''), 300);
   sheet.appendRow([
     dateFormatted,
     data.id || 'N/A',
@@ -619,7 +654,7 @@ function recordMentorshipToSheet(data) {
     data.phone || 'N/A',
     data.focusArea || 'N/A',
     data.desiredMentor || 'N/A',
-    data.reasonNeeded || 'N/A',
+    truncatedEssay,
     cohortDates,
     data.status || 'pending'
   ]);
@@ -660,7 +695,18 @@ function recordAlumniCoachToSheet(data) {
     sheet.setFrozenRows(1);
   }
 
+  // Duplicate check by email
+  const existingRows = sheet.getRange(2, 4, sheet.getLastRow() - 1, 1).getValues(); // Email column
+  const newEmail = String(data.email || '').trim().toLowerCase();
+  for (let i = 0; i < existingRows.length; i++) {
+    if (String(existingRows[i][0] || '').trim().toLowerCase() === newEmail) {
+      Logger.log('Duplicate coach application for email: ' + newEmail);
+      return; // ignore duplicate
+    }
+  }
+
   const dateFormatted = Utilities.formatDate(new Date(data.createdAt || new Date()), 'GMT+1', 'yyyy-MM-dd HH:mm:ss');
+  const truncatedPurpose = truncateWords(String(data.statementOfPurpose || ''), 300);
   sheet.appendRow([
     dateFormatted,
     data.id || 'N/A',
@@ -674,7 +720,7 @@ function recordAlumniCoachToSheet(data) {
     data.linkedinUrl || 'N/A',
     data.coachingDomain || 'N/A',
     data.availability || 'N/A',
-    data.statementOfPurpose || 'N/A',
+    truncatedPurpose,
     data.status || 'pending'
   ]);
 }

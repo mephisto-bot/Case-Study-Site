@@ -98,8 +98,8 @@ export const RegisterPage: React.FC = () => {
     }
 
     const words = countWords(formData.attendanceEssay || '');
-    if (words < 300) {
-      setErrorMsg(`Your essay explaining why you want to attend and why you want this specific topic must be at least 300 words. You have currently written ${words} words (${300 - words} more needed).`);
+    if (words > 300) {
+      setErrorMsg(`Your essay cannot exceed 300 words. You have currently written ${words} words (${words - 300} words over).`);
       return;
     }
 
@@ -536,7 +536,7 @@ export const RegisterPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Attendance & Topic Justification Essay (Minimum 300 Words) */}
+              {/* Attendance & Topic Justification Essay (Maximum 300 Words) */}
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -547,13 +547,13 @@ export const RegisterPage: React.FC = () => {
                       ? 'bg-rose-100 text-rose-700 font-extrabold'
                       : 'bg-emerald-100 text-emerald-800'
                   }`}>
-                    {countWords(formData.attendanceEssay || '')} / 300 words min
+                    {countWords(formData.attendanceEssay || '')} / 300 words max
                   </span>
                 </div>
                 <textarea
                   required
                   rows={7}
-                  placeholder="In not less than 300 words, tell us: (1) Why do you want to attend Case Study? and (2) Why do you want this particular topic? (Your essay will be reviewed for seat selection)..."
+                  placeholder="Write up to 300 words explaining why you want to attend the Case Study and why this topic interests you. (Your essay will be reviewed for seat selection)..."
                   value={formData.attendanceEssay || ''}
                   onChange={(e) => setFormData({ ...formData, attendanceEssay: e.target.value })}
                   className={`w-full px-4 py-3 rounded-xl border text-sm text-slate-800 focus:outline-none transition-all leading-relaxed ${
@@ -562,17 +562,17 @@ export const RegisterPage: React.FC = () => {
                       : 'border-slate-200 focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange'
                   }`}
                 />
-                {countWords(formData.attendanceEssay || '') < 300 ? (
-                  <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    Minimum 300 words required ({300 - countWords(formData.attendanceEssay || '')} more words needed before you can submit).
-                  </p>
-                ) : (
-                  <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Word requirement met ({countWords(formData.attendanceEssay || '')} words).
-                  </p>
-                )}
+                {countWords(formData.attendanceEssay || '') > 300 ? (
+  <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
+    <AlertCircle className="w-3.5 h-3.5" />
+    Maximum 300 words allowed ({countWords(formData.attendanceEssay || '') - 300} words over limit).
+  </p>
+) : (
+  <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+    <CheckCircle2 className="w-3.5 h-3.5" />
+    Word count acceptable ({countWords(formData.attendanceEssay || '')} words).
+  </p>
+)}
               </div>
 
               {/* Mandatory Media & Photo/Video Consent Box */}
@@ -597,7 +597,7 @@ export const RegisterPage: React.FC = () => {
               {/* Submit CTA */}
               <button
                 type="submit"
-                disabled={loading || !formData.mediaConsent || countWords(formData.attendanceEssay || '') < 300}
+                disabled={loading || !formData.mediaConsent || countWords(formData.attendanceEssay || '') > 300}
                 className="w-full inline-flex items-center justify-center gap-2 py-4 px-6 rounded-xl bg-brand-orange hover:bg-brand-orange-hover text-white text-sm sm:text-base font-bold shadow-lg hover:shadow-orange-glow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (

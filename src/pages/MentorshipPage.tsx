@@ -249,6 +249,7 @@ export const MentorshipPage: React.FC = () => {
     user && (
       user.isApprovedMentor ||
       user.mentorRole === 'Coach' ||
+      user.isMentorVolunteer ||
       isFoundationCoach ||
       isApprovedAlumniCoach
     )
