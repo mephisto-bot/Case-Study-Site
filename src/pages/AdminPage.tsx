@@ -361,6 +361,18 @@ export const AdminPage: React.FC = () => {
     setNewStudy(prev => ({ ...prev, galleryImages: updated }));
   };
 
+  // Case Study Video File Upload Handler
+  const handleVideoFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setNewStudy(prev => ({ ...prev, videoUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Case Study Save Handler
   const handleSaveNewStudy = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1275,44 +1287,61 @@ export const AdminPage: React.FC = () => {
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Primary Cover Image URL (or select from upload above)</label>
-                    <input
-                      type="text"
-                      value={newStudy.imageUrl || ''}
-                      onChange={(e) => setNewStudy({ ...newStudy, imageUrl: e.target.value })}
-                      placeholder="/images/elevator-pitch-presenter.jpg"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
-                    />
+                  {/* Video Upload & YouTube Section */}
+                  <div className="md:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider flex items-center gap-2">
+                        <Video className="w-4 h-4 text-brand-orange" />
+                        Session Video (Upload File or Paste YouTube Link)
+                      </h4>
+                      {newStudy.videoUrl && (
+                        <span className="text-xs font-bold text-emerald-600">✓ Video File Selected</span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Option A: Select Video File from Device</label>
+                        <label className="cursor-pointer inline-flex items-center justify-center gap-2 w-full px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95">
+                          <Upload className="w-3.5 h-3.5 text-brand-orange" />
+                          <span>Choose Video File (.mp4, .webm)</span>
+                          <input
+                            type="file"
+                            accept="video/*"
+                            onChange={handleVideoFileSelected}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Option B: YouTube URL or Video ID</label>
+                        <input
+                          type="text"
+                          value={newStudy.youtubeUrl || ''}
+                          onChange={(e) => setNewStudy({ ...newStudy, youtubeUrl: e.target.value })}
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Local Video File Path</label>
-                    <input
-                      type="text"
-                      value={newStudy.videoUrl || ''}
-                      onChange={(e) => setNewStudy({ ...newStudy, videoUrl: e.target.value })}
-                      placeholder="/videos/the-elevator-pitch.mp4"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">YouTube URL or Video ID</label>
-                    <input
-                      type="text"
-                      value={newStudy.youtubeUrl || ''}
-                      onChange={(e) => setNewStudy({ ...newStudy, youtubeUrl: e.target.value })}
-                      placeholder="https://www.youtube.com/watch?v=... or YouTube Video ID"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Session Slides Link (Google Drive / Slides Embed Link / PDF URL)</label>
+
+                  {/* Google Slides Presentation Link */}
+                  <div className="md:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-brand-orange" />
+                      Google Slides Presentation Deck Link
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Paste your Google Slides share link (e.g. <code>https://docs.google.com/presentation/d/...</code>). Attendees can view the presentation directly inside the case study modal.
+                    </p>
                     <input
                       type="text"
                       value={newStudy.slidesUrl || ''}
                       onChange={(e) => setNewStudy({ ...newStudy, slidesUrl: e.target.value })}
                       placeholder="https://docs.google.com/presentation/d/... or Google Drive share link"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange font-mono"
                     />
                   </div>
                   <div className="md:col-span-2">
