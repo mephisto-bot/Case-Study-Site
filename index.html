@@ -20,6 +20,18 @@
   </head>
   <body class="bg-white text-slate-800 font-sans antialiased selection:bg-brand-orange selection:text-white">
     <div id="root"></div>
+    <script>
+      // Global error catcher - shows error visually instead of blank page
+      window.addEventListener('error', function(e) {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          root.innerHTML = '<div style="padding:40px;font-family:sans-serif;max-width:700px;margin:0 auto"><h2 style="color:#FF6B00">CIH App Error</h2><p style="color:#333">A runtime error occurred. Details:</p><pre style="background:#f5f5f5;padding:16px;border-radius:8px;overflow:auto;font-size:12px">' + (e.message || 'Unknown error') + '\n\nFile: ' + (e.filename || '') + '\nLine: ' + (e.lineno || '') + '</pre><p style="color:#666">Please clear your browser cache (Ctrl+Shift+R) and refresh.</p></div>';
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        console.error('Unhandled promise rejection:', e.reason);
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
