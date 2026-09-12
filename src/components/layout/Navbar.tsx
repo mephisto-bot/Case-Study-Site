@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake, GraduationCap } from 'lucide-react';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
 import { useAuth } from '../../context/AuthContext';
 import { fetchCloudAdminData } from '../../services/api';
 import { UserProfileModal } from '../auth/UserProfileModal';
 
-
 export const Navbar: React.FC = () => {
+  const location = useLocation();
   const { user, isAuthenticated, isAlumni, isMentorVolunteer, authModalOpen, authModalMode, initialSignupRole, openAuthModal, closeAuthModal, openProfileModal } = useAuth();
 
   const [pendingCount, setPendingCount] = useState(0);
