@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake, GraduationCap } from 'lucide-react';
+import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake } from 'lucide-react';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
 import { useAuth } from '../../context/AuthContext';
-import { fetchCloudAdminData } from '../../services/api';
 import { UserProfileModal } from '../auth/UserProfileModal';
 import { AuthModal } from '../auth/AuthModal';
 
@@ -11,32 +10,6 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
   const { user, isAuthenticated, isAlumni, isMentorVolunteer, authModalOpen, authModalMode, initialSignupRole, openAuthModal, closeAuthModal, openProfileModal } = useAuth();
 
-  const [pendingCount, setPendingCount] = useState(0);
-  // Check if user is any kind of coach / mentor
-  const isMentor = Boolean(
-    user && (user.isMentorVolunteer || user.isApprovedMentor || user.mentorRole === 'Coach')
-  );
-
-  useEffect(() => {
-    if (isMentor && user) {
-      fetchCloudAdminData()
-        .then((data) => {
-          const count = (data.mentorshipApplications ?? []).filter(
-            (app) =>
-              app.status === 'pending' &&
-              (
-                !app.assignedCoach ||
-                app.assignedCoach.toLowerCase() === user.email.toLowerCase() ||
-                app.assignedCoach === 'Any Available CIH Coach (Automatic Match)'
-              )
-          ).length;
-          setPendingCount(count);
-        })
-        .catch((err) => console.warn('Failed to fetch admin data for badge', err));
-    } else {
-      setPendingCount(0);
-    }
-  }, [isMentor, user]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -106,26 +79,6 @@ export const Navbar: React.FC = () => {
                   </Link>
                 );
               })}
-              {/* Mentor / Coach Desk link — only visible to coaches & mentors */}
-              {isMentor && (
-                <Link
-                  to="/mentorship"
-                  className={`relative text-xs xl:text-sm font-semibold transition-colors py-2 whitespace-nowrap flex items-center gap-1.5 ${
-                    isActive('/mentorship') ? 'text-navy-900 font-bold' : 'text-brand-orange hover:text-brand-orange/80'
-                  }`}
-                >
-                  <GraduationCap className="w-3.5 h-3.5" />
-                  Mentor Desk
-                  {pendingCount > 0 && (
-                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold leading-none text-white bg-red-600 rounded-full">
-                      {pendingCount}
-                    </span>
-                  )}
-                  {isActive('/mentorship') && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-orange rounded-full animate-fade-in" />
-                  )}
-                </Link>
-              )}
             </nav>
 
             {/* Desktop Actions (>= 1024px) */}
@@ -325,24 +278,6 @@ export const Navbar: React.FC = () => {
                   </Link>
                 );
               })}
-              {/* Mentor Desk — visible to all coaches/mentors in mobile menu */}
-              {isMentor && (
-                <Link
-                  to="/mentorship"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-brand-orange/10 text-brand-orange border-l-4 border-brand-orange"
-                >
-                  <span className="flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4" />
-                    Mentor Desk
-                  </span>
-                  {pendingCount > 0 && (
-                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold text-white bg-red-600 rounded-full">
-                      {pendingCount}
-                    </span>
-                  )}
-                </Link>
-              )}
             </div>
 
             {/* Drawer Footer Links */}
