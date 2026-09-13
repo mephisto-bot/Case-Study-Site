@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake, Bell } from 'lucide-react';
+import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake } from 'lucide-react';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
 import { useAuth } from '../../context/AuthContext';
 import { fetchCloudAdminData } from '../../services/api';
@@ -115,21 +115,6 @@ export const Navbar: React.FC = () => {
 
             {/* Desktop Actions (>= 1024px) */}
             <div className="hidden lg:flex items-center gap-2 xl:gap-2.5 shrink-0">
-              {/* Coach Mentorship Application Notification Bell */}
-              {isCoach && (
-                <Link
-                  to="/mentorship"
-                  className="relative p-2 text-slate-600 hover:text-navy-900 hover:bg-slate-100 rounded-xl transition-colors flex items-center justify-center"
-                  title={pendingCount > 0 ? `${pendingCount} new mentorship application(s) pending review` : 'Mentorship Coach Hub'}
-                >
-                  <Bell className="w-4 h-4 text-brand-orange" />
-                  {pendingCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-extrabold text-white bg-red-600 rounded-full shadow-xs animate-pulse">
-                      {pendingCount}
-                    </span>
-                  )}
-                </Link>
-              )}
 
               <button
                 onClick={() => setSearchOpen(true)}
