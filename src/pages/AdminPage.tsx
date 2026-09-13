@@ -37,7 +37,8 @@ import {
   Briefcase,
   RefreshCw,
   Database,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Video
 } from 'lucide-react';
 import { 
   getStoredCaseStudies, 
