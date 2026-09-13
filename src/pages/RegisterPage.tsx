@@ -403,7 +403,7 @@ export const RegisterPage: React.FC = () => {
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-navy-900 text-xs sm:text-sm">{user.fullName}</span>
                     <span className="px-2 py-0.5 rounded-md bg-brand-orange/15 text-brand-orange text-[10px] font-extrabold uppercase">
-                      {user.role === 'alumni' ? (user.isMentorVolunteer ? 'Mentor' : 'Alumni') : 'Guest'}
+                      {user.role === 'alumni' ? (user.isMentorVolunteer ? 'Coach' : 'Alumni') : 'Guest'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500">{user.email}</p>

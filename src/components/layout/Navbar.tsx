@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake } from 'lucide-react';
+import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake, Bell } from 'lucide-react';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
 import { useAuth } from '../../context/AuthContext';
+import { fetchCloudAdminData } from '../../services/api';
 import { UserProfileModal } from '../auth/UserProfileModal';
 import { AuthModal } from '../auth/AuthModal';
 
@@ -12,6 +13,32 @@ export const Navbar: React.FC = () => {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const isCoach = Boolean(
+    user && (user.isMentorVolunteer || user.isApprovedMentor || user.role === 'alumni' || user.mentorRole === 'Coach')
+  );
+
+  useEffect(() => {
+    if (isCoach && user) {
+      fetchCloudAdminData()
+        .then((data) => {
+          const count = (data.mentorshipApplications ?? []).filter(
+            (app) =>
+              app.status === 'pending' &&
+              (
+                !app.assignedCoach ||
+                app.assignedCoach.toLowerCase() === user.email.toLowerCase() ||
+                app.assignedCoach === 'Any Available CIH Coach (Automatic Match)'
+              )
+          ).length;
+          setPendingCount(count);
+        })
+        .catch((err) => console.warn('Failed to fetch admin data for badge', err));
+    } else {
+      setPendingCount(0);
+    }
+  }, [isCoach, user]);
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -68,11 +95,16 @@ export const Navbar: React.FC = () => {
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`relative text-xs xl:text-sm font-semibold transition-colors py-2 whitespace-nowrap ${
+                    className={`relative text-xs xl:text-sm font-semibold transition-colors py-2 whitespace-nowrap flex items-center gap-1.5 ${
                       active ? 'text-navy-900 font-bold' : 'text-slate-600 hover:text-navy-900'
                     }`}
                   >
-                    {link.name}
+                    <span>{link.name}</span>
+                    {link.path === '/mentorship' && isCoach && pendingCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-extrabold text-white bg-red-600 rounded-full shadow-xs animate-pulse">
+                        {pendingCount}
+                      </span>
+                    )}
                     {active && (
                       <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-orange rounded-full animate-fade-in" />
                     )}
@@ -83,6 +115,22 @@ export const Navbar: React.FC = () => {
 
             {/* Desktop Actions (>= 1024px) */}
             <div className="hidden lg:flex items-center gap-2 xl:gap-2.5 shrink-0">
+              {/* Coach Mentorship Application Notification Bell */}
+              {isCoach && (
+                <Link
+                  to="/mentorship"
+                  className="relative p-2 text-slate-600 hover:text-navy-900 hover:bg-slate-100 rounded-xl transition-colors flex items-center justify-center"
+                  title={pendingCount > 0 ? `${pendingCount} new mentorship application(s) pending review` : 'Mentorship Coach Hub'}
+                >
+                  <Bell className="w-4 h-4 text-brand-orange" />
+                  {pendingCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-extrabold text-white bg-red-600 rounded-full shadow-xs animate-pulse">
+                      {pendingCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+
               <button
                 onClick={() => setSearchOpen(true)}
                 className="p-2 text-slate-500 hover:text-navy-900 hover:bg-slate-100 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-semibold"
@@ -116,7 +164,7 @@ export const Navbar: React.FC = () => {
                       {user.fullName.split(' ')[0]}
                     </span>
                     <span className="text-[9px] xl:text-[10px] text-brand-orange font-semibold leading-tight">
-                      {isMentorVolunteer ? 'Mentor' : (isAlumni ? 'Alumni' : 'Guest')}
+                      {isMentorVolunteer ? 'Coach' : (isAlumni ? 'Alumni' : 'Guest')}
                     </span>
                   </div>
                 </Link>
@@ -224,7 +272,7 @@ export const Navbar: React.FC = () => {
                   <div className="min-w-0">
                     <h4 className="text-xs font-bold text-white truncate">{user.fullName}</h4>
                     <p className="text-[10px] text-slate-300 truncate">
-                      {isMentorVolunteer ? 'CIH Alumni Mentor' : (isAlumni ? 'CIH Alumni Native' : 'Guest Scholar')}
+                      {isMentorVolunteer ? 'CIH Alumni Coach' : (isAlumni ? 'CIH Alumni Native' : 'Guest Scholar')}
                     </p>
                   </div>
                 </div>
@@ -268,13 +316,18 @@ export const Navbar: React.FC = () => {
                     key={link.path}
                     to={link.path}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`block px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
                       active
                         ? 'bg-brand-orange/10 text-brand-orange border-l-4 border-brand-orange font-bold'
                         : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {link.name}
+                    <span>{link.name}</span>
+                    {link.path === '/mentorship' && isCoach && pendingCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-extrabold text-white bg-red-600 rounded-full shadow-xs animate-pulse">
+                        {pendingCount} new
+                      </span>
+                    )}
                   </Link>
                 );
               })}

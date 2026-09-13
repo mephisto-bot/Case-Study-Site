@@ -377,13 +377,14 @@ export const AdminPage: React.FC = () => {
   // Case Study Save Handler
   const handleSaveNewStudy = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudy.title || !newStudy.excerpt) {
-      alert('Please provide at least a title and an excerpt.');
+    if (!newStudy.title) {
+      alert('Please provide a title for the case study.');
       return;
     }
 
     const finalGallery = uploadedGallery.length > 0 ? uploadedGallery : (newStudy.galleryImages || []);
     const coverImage = newStudy.imageUrl || (finalGallery.length > 0 ? finalGallery[0] : '/images/cih-photo-1.jpg');
+    const autoExcerpt = newStudy.excerpt || newStudy.subtitle || (newStudy.fullContent ? newStudy.fullContent.substring(0, 140) + '...' : newStudy.title);
 
     const created: CaseStudy = {
       id: `case-${Date.now()}`,
@@ -399,8 +400,8 @@ export const AdminPage: React.FC = () => {
       youtubeVideoId: newStudy.youtubeVideoId || '',
       videoTitle: newStudy.videoTitle || newStudy.title || '',
       slidesUrl: newStudy.slidesUrl || '',
-      excerpt: newStudy.excerpt,
-      fullContent: newStudy.fullContent || newStudy.excerpt,
+      excerpt: autoExcerpt,
+      fullContent: newStudy.fullContent || autoExcerpt,
       keyTakeaways: (newStudy.keyTakeaways || []).filter(t => t && t.trim().length > 0),
       discussionQuestions: (newStudy.discussionQuestions || []).filter(q => q && q.trim().length > 0),
       featured: false
@@ -1343,17 +1344,6 @@ export const AdminPage: React.FC = () => {
                       onChange={(e) => setNewStudy({ ...newStudy, slidesUrl: e.target.value })}
                       placeholder="https://docs.google.com/presentation/d/... or Google Drive share link"
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange font-mono"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Excerpt *</label>
-                    <textarea
-                      rows={2}
-                      value={newStudy.excerpt || ''}
-                      onChange={(e) => setNewStudy({ ...newStudy, excerpt: e.target.value })}
-                      placeholder="Concise summary for archive cards..."
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange"
-                      required
                     />
                   </div>
                   <div className="md:col-span-2">
