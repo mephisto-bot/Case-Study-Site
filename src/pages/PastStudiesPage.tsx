@@ -185,9 +185,16 @@ export const PastStudiesPage: React.FC = () => {
 
                   {/* Body Content */}
                   <div className="p-6 space-y-3">
-                    <span className="inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
-                      {study.sector}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+                        {study.sector}
+                      </span>
+                      {study.presenter && (
+                        <span className="inline-block px-2.5 py-1 rounded-full bg-brand-orange/10 text-brand-orange text-xs font-semibold">
+                          Coach: {study.presenter}
+                        </span>
+                      )}
+                    </div>
 
                     <h3 className="text-xl font-bold text-navy-900 leading-snug group-hover:text-brand-orange transition-colors">
                       {study.title}

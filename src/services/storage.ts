@@ -29,17 +29,19 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
         const init = initialMap.get(study.id);
         if (init) {
           return {
+            ...init,
             ...study,
-            date: init.date,
-            weekNumber: init.weekNumber,
-            imageUrl: init.imageUrl,
-            galleryImages: init.galleryImages || study.galleryImages,
-            videoUrl: init.videoUrl || study.videoUrl,
-            youtubeUrl: init.youtubeUrl || study.youtubeUrl,
-            youtubeVideoId: init.youtubeVideoId || study.youtubeVideoId,
-            videoTitle: init.videoTitle || study.videoTitle,
-            slidesUrl: study.slidesUrl || init.slidesUrl,
-            slidesEmbedUrl: study.slidesEmbedUrl || init.slidesEmbedUrl,
+            date: study.date || init.date,
+            weekNumber: study.weekNumber ?? init.weekNumber,
+            imageUrl: study.imageUrl || init.imageUrl,
+            galleryImages: (study.galleryImages && study.galleryImages.length > 0) ? study.galleryImages : init.galleryImages,
+            videoUrl: study.videoUrl !== undefined ? study.videoUrl : init.videoUrl,
+            youtubeUrl: study.youtubeUrl !== undefined ? study.youtubeUrl : init.youtubeUrl,
+            youtubeVideoId: study.youtubeVideoId !== undefined ? study.youtubeVideoId : init.youtubeVideoId,
+            videoTitle: study.videoTitle !== undefined ? study.videoTitle : init.videoTitle,
+            slidesUrl: study.slidesUrl !== undefined ? study.slidesUrl : init.slidesUrl,
+            slidesEmbedUrl: study.slidesEmbedUrl !== undefined ? study.slidesEmbedUrl : init.slidesEmbedUrl,
+            presenter: study.presenter || init.presenter,
           };
         }
         return study;

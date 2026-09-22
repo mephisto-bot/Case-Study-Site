@@ -38,7 +38,9 @@ import {
   RefreshCw,
   Database,
   FileSpreadsheet,
-  Video
+  Video,
+  Edit3,
+  Plus
 } from 'lucide-react';
 import { 
   getStoredCaseStudies, 
@@ -122,6 +124,15 @@ export const AdminPage: React.FC = () => {
     videoUrl: '',
     slidesUrl: ''
   });
+
+  // Edit Case Study State
+  const [editingStudy, setEditingStudy] = useState<CaseStudy | null>(null);
+  const [editForm, setEditForm] = useState<Partial<CaseStudy>>({});
+  const [editGallery, setEditGallery] = useState<string[]>([]);
+  const [editTakeaways, setEditTakeaways] = useState<string[]>([]);
+  const [editQuestions, setEditQuestions] = useState<string[]>([]);
+  const [newImageUrlInput, setNewImageUrlInput] = useState<string>('');
+  const [editSuccessToast, setEditSuccessToast] = useState<string | null>(null);
 
   // Upcoming Session State
   const [upcomingSession, setUpcomingSession] = useState<UpcomingSession>(getStoredUpcomingSession());
@@ -437,7 +448,173 @@ export const AdminPage: React.FC = () => {
       const updated = caseStudies.filter(c => c.id !== id);
       setCaseStudies(updated);
       saveStoredCaseStudies(updated);
+      if (editingStudy && editingStudy.id === id) {
+        setEditingStudy(null);
+      }
     }
+  };
+
+  // Case Study Edit Handlers
+  const handleStartEditStudy = (study: CaseStudy) => {
+    setEditingStudy(study);
+    setEditForm({
+      title: study.title,
+      subtitle: study.subtitle || '',
+      sector: study.sector || 'Ethics & Leadership',
+      date: study.date || '',
+      weekNumber: study.weekNumber,
+      presenter: study.presenter || '',
+      imageUrl: study.imageUrl || '',
+      videoUrl: study.videoUrl || '',
+      youtubeUrl: study.youtubeUrl || '',
+      youtubeVideoId: study.youtubeVideoId || '',
+      videoTitle: study.videoTitle || '',
+      slidesUrl: study.slidesUrl || study.slidesEmbedUrl || '',
+      excerpt: study.excerpt || '',
+      fullContent: study.fullContent || '',
+      featured: study.featured || false,
+    });
+    const gallery = (study.galleryImages && study.galleryImages.length > 0)
+      ? [...study.galleryImages]
+      : (study.imageUrl ? [study.imageUrl] : []);
+    setEditGallery(gallery);
+    setEditTakeaways(study.keyTakeaways && study.keyTakeaways.length > 0 ? [...study.keyTakeaways] : ['']);
+    setEditQuestions(study.discussionQuestions && study.discussionQuestions.length > 0 ? [...study.discussionQuestions] : ['']);
+    setNewImageUrlInput('');
+  };
+
+  const handleEditImageFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    const readers = fileList.map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(readers).then(newImages => {
+      const combined = [...editGallery, ...newImages];
+      setEditGallery(combined);
+      if (!editForm.imageUrl && combined.length > 0) {
+        setEditForm(prev => ({ ...prev, imageUrl: combined[0] }));
+      }
+    });
+  };
+
+  const handleAddEditImageByUrl = () => {
+    const trimmed = newImageUrlInput.trim();
+    if (!trimmed) return;
+    const combined = [...editGallery, trimmed];
+    setEditGallery(combined);
+    if (!editForm.imageUrl) {
+      setEditForm(prev => ({ ...prev, imageUrl: trimmed }));
+    }
+    setNewImageUrlInput('');
+  };
+
+  const handleEditSetCoverImage = (imgUrl: string) => {
+    setEditForm(prev => ({ ...prev, imageUrl: imgUrl }));
+  };
+
+  const handleEditRemoveGalleryImage = (indexToRemove: number) => {
+    const targetUrl = editGallery[indexToRemove];
+    const updated = editGallery.filter((_, idx) => idx !== indexToRemove);
+    setEditGallery(updated);
+    if (editForm.imageUrl === targetUrl) {
+      setEditForm(prev => ({ ...prev, imageUrl: updated[0] || '/images/cih-photo-1.jpg' }));
+    }
+  };
+
+  const handleEditVideoFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditForm(prev => ({ ...prev, videoUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddEditTakeaway = () => {
+    setEditTakeaways(prev => [...prev, '']);
+  };
+
+  const handleUpdateEditTakeaway = (index: number, val: string) => {
+    setEditTakeaways(prev => {
+      const next = [...prev];
+      next[index] = val;
+      return next;
+    });
+  };
+
+  const handleRemoveEditTakeaway = (index: number) => {
+    setEditTakeaways(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddEditQuestion = () => {
+    setEditQuestions(prev => [...prev, '']);
+  };
+
+  const handleUpdateEditQuestion = (index: number, val: string) => {
+    setEditQuestions(prev => {
+      const next = [...prev];
+      next[index] = val;
+      return next;
+    });
+  };
+
+  const handleRemoveEditQuestion = (index: number) => {
+    setEditQuestions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveEditStudy = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudy) return;
+
+    if (!editForm.title || !editForm.title.trim()) {
+      alert('Please provide a title for the case study.');
+      return;
+    }
+
+    const finalGallery = editGallery.length > 0 ? editGallery : [editingStudy.imageUrl || '/images/cih-photo-1.jpg'];
+    const coverImage = editForm.imageUrl || finalGallery[0] || '/images/cih-photo-1.jpg';
+    const autoExcerpt = editForm.excerpt || editForm.subtitle || (editForm.fullContent ? editForm.fullContent.substring(0, 140) + '...' : editForm.title);
+
+    const updatedStudy: CaseStudy = {
+      ...editingStudy,
+      title: editForm.title.trim(),
+      subtitle: editForm.subtitle?.trim() || '',
+      sector: editForm.sector?.trim() || 'General',
+      date: editForm.date?.trim() || editingStudy.date,
+      weekNumber: editForm.weekNumber !== undefined && editForm.weekNumber !== null && editForm.weekNumber !== ('' as any)
+        ? Number(editForm.weekNumber)
+        : editingStudy.weekNumber,
+      presenter: editForm.presenter?.trim() || '',
+      imageUrl: coverImage,
+      galleryImages: finalGallery,
+      videoUrl: editForm.videoUrl || '',
+      youtubeUrl: editForm.youtubeUrl?.trim() || '',
+      youtubeVideoId: editForm.youtubeVideoId || '',
+      videoTitle: editForm.videoTitle || editForm.title || '',
+      slidesUrl: editForm.slidesUrl?.trim() || '',
+      excerpt: autoExcerpt,
+      fullContent: editForm.fullContent?.trim() || autoExcerpt,
+      keyTakeaways: editTakeaways.map(t => t.trim()).filter(t => t.length > 0),
+      discussionQuestions: editQuestions.map(q => q.trim()).filter(q => q.length > 0),
+      featured: editForm.featured || false,
+    };
+
+    const updatedList = caseStudies.map(s => s.id === editingStudy.id ? updatedStudy : s);
+    setCaseStudies(updatedList);
+    saveStoredCaseStudies(updatedList);
+    setEditingStudy(null);
+    setEditSuccessToast(`Case study "${updatedStudy.title}" updated successfully!`);
+    setTimeout(() => setEditSuccessToast(null), 4000);
   };
 
   // Feedback Reply Handler
@@ -1380,15 +1557,26 @@ export const AdminPage: React.FC = () => {
             )}
 
             {/* List of Case Studies */}
+            {/* List of Case Studies */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {caseStudies.map((study) => (
-                <div key={study.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col justify-between">
+                <div key={study.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col justify-between hover:border-brand-orange/40 transition-colors">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
+                        {study.weekNumber !== undefined && (
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-navy-900 text-white">
+                            Week {study.weekNumber}
+                          </span>
+                        )}
                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700">
                           {study.sector}
                         </span>
+                        {study.presenter && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-orange/10 text-brand-orange">
+                            Coach: {study.presenter}
+                          </span>
+                        )}
                         {(study.videoUrl || study.youtubeUrl || study.youtubeVideoId) && (
                           <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-orange-100 text-brand-orange border border-orange-200">
                             Video
@@ -1409,17 +1597,472 @@ export const AdminPage: React.FC = () => {
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                     <span className="text-[10px] text-slate-400 font-mono">ID: {study.id}</span>
-                    <button
-                      onClick={() => handleDeleteStudy(study.id)}
-                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                      title="Delete Entry"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditStudy(study)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-navy-900 hover:text-white text-navy-900 text-xs font-bold rounded-xl transition-all shadow-xs active:scale-95"
+                        title="Edit Case Study Details"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-brand-orange" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStudy(study.id)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Entry"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Edit Case Study Toast */}
+            {editSuccessToast && (
+              <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white text-xs font-bold rounded-2xl shadow-xl animate-fade-in">
+                <CheckCircle className="w-4 h-4 text-emerald-200" />
+                <span>{editSuccessToast}</span>
+              </div>
+            )}
+
+            {/* Modal: Edit Case Study */}
+            {editingStudy && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-navy-950/80 backdrop-blur-sm overflow-y-auto animate-fade-in">
+                <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 my-auto">
+                  {/* Modal Header */}
+                  <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        {editingStudy.weekNumber !== undefined && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-navy-900 text-white text-[10px] font-extrabold uppercase tracking-wider">
+                            Week {editingStudy.weekNumber}
+                          </span>
+                        )}
+                        <span className="px-2.5 py-0.5 rounded-full bg-brand-orange-light text-brand-orange text-[10px] font-extrabold uppercase tracking-wider">
+                          {editingStudy.sector}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                          ID: {editingStudy.id}
+                        </span>
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-extrabold text-navy-900">
+                        Edit Case Study
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Update session details, photos, writeups, key takeaways, and presenter info.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => setEditingStudy(null)}
+                      className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                      aria-label="Close dialog"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveEditStudy} className="space-y-6">
+                    {/* Section 1: Core Details */}
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+                      <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-brand-orange" />
+                        1. Session Information
+                      </h4>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            Case Study Title <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.title || ''}
+                            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                            placeholder="e.g. Case Study: Preparing the Vessel"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                            required
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Subtitle / Session Sub-theme</label>
+                          <input
+                            type="text"
+                            value={editForm.subtitle || ''}
+                            onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })}
+                            placeholder="e.g. Building capacity and positioning yourself to receive and sustain greater things"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Week Number</label>
+                          <input
+                            type="number"
+                            value={editForm.weekNumber ?? ''}
+                            onChange={(e) => setEditForm({ ...editForm, weekNumber: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                            placeholder="e.g. 20"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Presenter / Coach Name</label>
+                          <input
+                            type="text"
+                            value={editForm.presenter || ''}
+                            onChange={(e) => setEditForm({ ...editForm, presenter: e.target.value })}
+                            placeholder="e.g. Kenny"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Sector / Domain</label>
+                          <input
+                            type="text"
+                            value={editForm.sector || ''}
+                            onChange={(e) => setEditForm({ ...editForm, sector: e.target.value })}
+                            placeholder="e.g. Personal Growth & Productivity"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Session Date</label>
+                          <input
+                            type="text"
+                            value={editForm.date || ''}
+                            onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                            placeholder="e.g. Wednesday, Sep 17, 2026"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 pt-1">
+                          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={editForm.featured || false}
+                              onChange={(e) => setEditForm({ ...editForm, featured: e.target.checked })}
+                              className="rounded text-brand-orange focus:ring-brand-orange h-4 w-4"
+                            />
+                            <span>Feature prominently on Home Page highlights</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Photo Gallery & Cover Selection */}
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-brand-orange" />
+                          <div>
+                            <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider">
+                              2. Session Photo Gallery & Cover Image
+                            </h4>
+                            <p className="text-[11px] text-slate-500">
+                              Upload photos from your device, add image URLs, and choose which photo acts as the primary cover.
+                            </p>
+                          </div>
+                        </div>
+
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 shrink-0">
+                          <Upload className="w-3.5 h-3.5 text-brand-orange" />
+                          <span>Upload Device Photos</span>
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={handleEditImageFilesSelected}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Add Image by URL input */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newImageUrlInput}
+                          onChange={(e) => setNewImageUrlInput(e.target.value)}
+                          placeholder="Paste an image path or URL (e.g. /images/preparing-the-vessel-1.jpg or https://...)"
+                          className="flex-1 px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white font-mono"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddEditImageByUrl();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddEditImageByUrl}
+                          className="px-4 py-2 bg-slate-200 hover:bg-navy-900 hover:text-white text-navy-900 text-xs font-bold rounded-xl transition-colors shrink-0"
+                        >
+                          Add URL
+                        </button>
+                      </div>
+
+                      {/* Gallery Thumbnails Grid */}
+                      <div className="pt-1">
+                        <div className="text-xs font-bold text-slate-600 mb-2">
+                          {editGallery.length} Image(s) in Gallery:
+                        </div>
+
+                        {editGallery.length === 0 ? (
+                          <div className="p-6 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 text-xs">
+                            No images in gallery yet. Upload photos from your device or paste image URLs above.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-64 overflow-y-auto p-2.5 bg-white rounded-xl border border-slate-200">
+                            {editGallery.map((imgUrl, idx) => {
+                              const isCover = editForm.imageUrl === imgUrl || (!editForm.imageUrl && idx === 0);
+                              return (
+                                <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-100 shadow-xs">
+                                  <img
+                                    src={imgUrl}
+                                    alt={`Gallery photo ${idx + 1}`}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = '/images/cih-photo-1.jpg';
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-navy-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
+                                    {!isCover && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditSetCoverImage(imgUrl)}
+                                        className="px-2 py-0.5 rounded bg-brand-orange text-white text-[10px] font-bold shadow"
+                                      >
+                                        Set Cover
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditRemoveGalleryImage(idx)}
+                                      className="p-1 rounded bg-rose-600 text-white text-xs hover:bg-rose-700"
+                                      title="Remove Photo"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  {isCover && (
+                                    <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-extrabold uppercase shadow">
+                                      Cover
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Section 3: Video & Presentation Deck */}
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+                      <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider flex items-center gap-2">
+                        <Video className="w-4 h-4 text-brand-orange" />
+                        3. Video & Presentation Slides
+                      </h4>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">YouTube URL or Video Embed</label>
+                          <input
+                            type="text"
+                            value={editForm.youtubeUrl || ''}
+                            onChange={(e) => setEditForm({ ...editForm, youtubeUrl: e.target.value })}
+                            placeholder="https://www.youtube.com/watch?v=..."
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Option: Upload Local Video (.mp4)</label>
+                          <label className="cursor-pointer inline-flex items-center justify-center gap-2 w-full px-3.5 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95">
+                            <Upload className="w-3.5 h-3.5 text-brand-orange" />
+                            <span>{editForm.videoUrl ? 'Replace Video File' : 'Upload Video File'}</span>
+                            <input
+                              type="file"
+                              accept="video/*"
+                              onChange={handleEditVideoFileSelected}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Google Slides Presentation Link</label>
+                          <input
+                            type="text"
+                            value={editForm.slidesUrl || ''}
+                            onChange={(e) => setEditForm({ ...editForm, slidesUrl: e.target.value })}
+                            placeholder="https://docs.google.com/presentation/d/... or Google Drive share link"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white font-mono"
+                          />
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            Embedded presentation deck displays directly in the case study modal for attendees.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 4: Excerpt & Full Narrative Writeup */}
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+                      <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-brand-orange" />
+                        4. Case Context & Written Narrative
+                      </h4>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Excerpt (Short preview summary for cards)</label>
+                        <textarea
+                          rows={2}
+                          value={editForm.excerpt || ''}
+                          onChange={(e) => setEditForm({ ...editForm, excerpt: e.target.value })}
+                          placeholder="Brief 1-2 sentence overview of the case study..."
+                          className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Full Session Writeup / Narrative</label>
+                        <textarea
+                          rows={6}
+                          value={editForm.fullContent || ''}
+                          onChange={(e) => setEditForm({ ...editForm, fullContent: e.target.value })}
+                          placeholder="Detailed scenario breakdown, discussion context, biblical or historical references, and real-world application..."
+                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white leading-relaxed"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section 5: Key Takeaways */}
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-brand-orange" />
+                          5. Key Insights & Takeaways ({editTakeaways.length})
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={handleAddEditTakeaway}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-brand-orange/10 text-brand-orange hover:bg-brand-orange hover:text-white rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Insight</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {editTakeaways.map((takeaway, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-brand-orange/10 text-brand-orange text-xs font-bold flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={takeaway}
+                              onChange={(e) => handleUpdateEditTakeaway(idx, e.target.value)}
+                              placeholder={`Key Insight #${idx + 1}...`}
+                              className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditTakeaway(idx)}
+                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
+                              title="Delete Insight"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Section 6: Peer Deliberation Questions */}
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider flex items-center gap-2">
+                          <HelpCircle className="w-4 h-4 text-brand-orange" />
+                          6. Peer Deliberation Questions ({editQuestions.length})
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={handleAddEditQuestion}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-brand-orange/10 text-brand-orange hover:bg-brand-orange hover:text-white rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Question</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {editQuestions.map((q, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-navy-100 text-navy-900 text-xs font-bold flex items-center justify-center shrink-0 font-mono">
+                              Q{idx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={q}
+                              onChange={(e) => handleUpdateEditQuestion(idx, e.target.value)}
+                              placeholder={`Peer debate prompt #${idx + 1}...`}
+                              className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditQuestion(idx)}
+                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
+                              title="Delete Question"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Modal Action Footer */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStudy(editingStudy.id)}
+                        className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Case Study</span>
+                      </button>
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setEditingStudy(null)}
+                          className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Save Changes</span>
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
