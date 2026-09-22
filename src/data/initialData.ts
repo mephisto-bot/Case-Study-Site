@@ -2,7 +2,7 @@ import { CaseStudy, TopicModule, UpcomingSession, FAQItem, Testimonial } from '.
 import { getUpcomingWednesdayFormatted, getPastWednesdayStr } from '../utils/dateHelpers';
 
 export const initialUpcomingSession: UpcomingSession = {
-  weekTitle: "WEEK 20 • UPCOMING SESSION",
+  weekTitle: "WEEK 21 • UPCOMING SESSION",
   badgeText: "NEXT WEDNESDAY",
   topicTitle: "Mindset & Problem Framing",
   dateStr: getUpcomingWednesdayFormatted(),
@@ -15,12 +15,43 @@ export const initialUpcomingSession: UpcomingSession = {
 
 export const initialCaseStudies: CaseStudy[] = [
   {
+    id: "preparing-the-vessel",
+    title: "Case Study: Preparing the Vessel",
+    subtitle: "Building capacity and positioning yourself to receive and sustain greater things",
+    sector: "Personal Growth & Productivity",
+    tagColor: "bg-teal-50 text-teal-700 border-teal-200",
+    date: getPastWednesdayStr(0),
+    weekNumber: 20,
+    presenter: "Kenny",
+    imageUrl: "/images/preparing-the-vessel-1.jpg",
+    galleryImages: [
+      "/images/preparing-the-vessel-1.jpg",
+      "/images/preparing-the-vessel-2.jpg",
+      "/images/preparing-the-vessel-3.jpg"
+    ],
+    excerpt: "Inspired by the biblical story of the widow's oil, this session unpacked how individuals must deliberately build internal capacity — skills, mindset, and character — before they can hold and sustain greater opportunities.",
+    fullContent: "In this deeply inspiring session, Kenny drew on the timeless biblical account of the widow who told the prophet Elisha she had nothing but a small jar of oil. Elisha instructed her to gather as many empty vessels as possible from her neighbours — and miraculously, the oil kept flowing until every vessel was full. The moment the last container was filled, the oil stopped.\n\nThe lesson the session drove home: the oil did not run out — the vessels did. This became a powerful metaphor for the lives of young professionals and aspiring leaders. God, the universe, or any higher opportunity-granting force cannot pour more into you than the vessel you have prepared to receive it.\n\nParticipants explored what it means to 'prepare your vessel' in practical, everyday terms — from investing in education, skills and emotional intelligence, to cultivating discipline, integrity and a growth mindset. The session challenged everyone in the room to audit their current capacity: Are you expanding your container, or are you expecting a greater outpouring into the same limited vessel?\n\nKenny facilitated a rich group discussion on how preparation precedes promotion — and how many people pray for open doors without doing the inner work to walk confidently through them when they arrive. Real-world examples were drawn from business, career development, and personal leadership to show how capacity building is not a one-time event but a continuous, intentional lifestyle.",
+    keyTakeaways: [
+      "The Vessel Principle: Your capacity to receive determines your capacity to grow — expand your vessel before expecting more.",
+      "Preparation Precedes Promotion: Opportunities rarely wait for the unprepared; build your skills, character and networks now.",
+      "Continuous Capacity Building: Self-development is not a season — it is a permanent, intentional lifestyle choice.",
+      "Audit Your Container: Regularly assess where you are mentally, emotionally, spiritually, and professionally to identify growth gaps.",
+      "Community as Resource: Like the widow gathered vessels from neighbours, leverage your community and relationships to multiply your capacity."
+    ],
+    discussionQuestions: [
+      "What 'vessels' in your life are currently empty — what skills, habits, or character traits are you neglecting to develop?",
+      "How do you distinguish between waiting for the right opportunity and actively preparing so you are ready when it arrives?",
+      "In what practical ways can you 'gather more vessels' — i.e., expand your network, learning, and exposure — this week?"
+    ],
+    featured: true
+  },
+  {
     id: "the-big-break",
     title: "Case Study: THE BIG BREAK",
     subtitle: "Goal Planning & Progressive Execution through 30-Day Action Blueprints",
     sector: "Personal Growth & Productivity",
     tagColor: "bg-purple-50 text-purple-700 border-purple-200",
-    date: getPastWednesdayStr(0),
+    date: getPastWednesdayStr(1),
     weekNumber: 19,
     imageUrl: "/images/cih-photo-1.jpg",
     galleryImages: [

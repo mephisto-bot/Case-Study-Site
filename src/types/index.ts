@@ -18,6 +18,7 @@ export interface CaseStudy {
   fullContent?: string;
   keyTakeaways?: string[];
   discussionQuestions?: string[];
+  presenter?: string;
   featured?: boolean;
 }
 
