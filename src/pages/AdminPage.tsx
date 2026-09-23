@@ -321,12 +321,12 @@ export const AdminPage: React.FC = () => {
     const config = getAdminConfig();
     const validPin = config.adminPasscode || 'cih2024';
 
-    if (passcode === validPin || passcode === 'cih2024' || passcode === 'admin123') {
+    if (passcode === validPin) {
       setIsAuthenticated(true);
       sessionStorage.setItem('cih_admin_auth', 'true');
       setLoginError('');
     } else {
-      setLoginError('Invalid administrator passcode. Try: cih2024');
+      setLoginError('Invalid administrator passcode. Please try again.');
     }
   };
 
@@ -1129,7 +1129,7 @@ export const AdminPage: React.FC = () => {
                 required
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Enter passcode (default: cih2024)"
+                placeholder="Enter administrator passcode"
                 className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
               />
             </div>
@@ -1140,12 +1140,6 @@ export const AdminPage: React.FC = () => {
             >
               Unlock Dashboard
             </button>
-
-            <div className="text-center">
-              <span className="text-xs text-slate-400">
-                Default access PIN: <code className="bg-slate-100 px-2 py-0.5 rounded font-mono text-navy-900">cih2024</code>
-              </span>
-            </div>
           </form>
         </div>
       </div>
@@ -3260,7 +3254,7 @@ export const AdminPage: React.FC = () => {
                   type="text"
                   value={adminConfig.adminPasscode}
                   onChange={(e) => setAdminConfig({ ...adminConfig, adminPasscode: e.target.value })}
-                  placeholder="e.g. cih2024"
+                  placeholder="Enter new passcode"
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-orange/50 max-w-xs"
                 />
               </div>

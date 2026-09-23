@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake } from 'lucide-react';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
 import { useAuth } from '../../context/AuthContext';
@@ -9,11 +9,58 @@ import { AuthModal } from '../auth/AuthModal';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, isAuthenticated, isAlumni, isMentorVolunteer, authModalOpen, authModalMode, initialSignupRole, openAuthModal, closeAuthModal, openProfileModal } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+
+  // Admin authentication state (only visible to authenticated admin)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem('cih_admin_auth') === 'true';
+  });
+
+  useEffect(() => {
+    const checkAdmin = () => {
+      setIsAdminAuthenticated(sessionStorage.getItem('cih_admin_auth') === 'true');
+    };
+    checkAdmin();
+    window.addEventListener('storage', checkAdmin);
+    return () => window.removeEventListener('storage', checkAdmin);
+  }, [location.pathname]);
+
+  // Secret Hotkey: Ctrl + Shift + A (or Cmd + Shift + A) to access Admin Portal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        navigate('/admin');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
+  // Secret Triple-Click on Brand Logo to access Admin Portal (convenient for mobile & desktop)
+  const logoClicksRef = useRef<number>(0);
+  const logoTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    logoClicksRef.current += 1;
+    if (logoTimerRef.current) clearTimeout(logoTimerRef.current);
+
+    if (logoClicksRef.current >= 3) {
+      e.preventDefault();
+      logoClicksRef.current = 0;
+      navigate('/admin');
+      return;
+    }
+
+    logoTimerRef.current = setTimeout(() => {
+      logoClicksRef.current = 0;
+    }, 800);
+  };
 
   const isCoach = Boolean(
     user && (user.isMentorVolunteer || user.isApprovedMentor || user.role === 'alumni' || user.mentorRole === 'Coach')
@@ -66,7 +113,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center justify-between h-16 sm:h-20 gap-2">
             
             {/* Logo + Brand Container */}
-            <Link to="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0 min-w-0">
+            <Link to="/" onClick={handleLogoClick} className="flex items-center gap-2 sm:gap-2.5 group shrink-0 min-w-0">
               <img 
                 src="/images/cih-logo.png" 
                 alt="Community Innovation Hub Logo" 
@@ -125,13 +172,17 @@ export const Navbar: React.FC = () => {
                 <span className="hidden 2xl:inline text-slate-400">Search</span>
               </button>
 
-              <Link
-                to="/admin"
-                title="Organizer Portal"
-                className="p-2 text-slate-400 hover:text-navy-900 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                <Shield className="w-4 h-4" />
-              </Link>
+              {/* Organizer Portal button - visible ONLY when already authenticated as admin */}
+              {isAdminAuthenticated && (
+                <Link
+                  to="/admin"
+                  title="Organizer Portal (Logged In)"
+                  className="p-2 text-brand-orange hover:text-brand-orange-hover hover:bg-brand-orange/10 rounded-xl transition-colors relative"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                </Link>
+              )}
 
               {/* Authentication Actions */}
               {isAuthenticated && user ? (
@@ -320,13 +371,17 @@ export const Navbar: React.FC = () => {
 
             {/* Drawer Footer Links */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between px-2">
-              <Link
-                to="/admin"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-xs text-slate-500 hover:text-navy-900 flex items-center gap-1.5 py-1"
-              >
-                <Shield className="w-3.5 h-3.5" /> Organizer Portal
-              </Link>
+              {isAdminAuthenticated ? (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-xs text-brand-orange font-semibold flex items-center gap-1.5 py-1"
+                >
+                  <Shield className="w-3.5 h-3.5" /> Organizer Portal
+                </Link>
+              ) : (
+                <div />
+              )}
               <a
                 href="https://cih.com.ng"
                 target="_blank"

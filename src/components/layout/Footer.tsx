@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, ShieldCheck, Globe, Sparkles } from 'lucide-react';
+import { ExternalLink, Globe, Sparkles } from 'lucide-react';
 import { ContactModal } from '../common/ContactModal';
 
 export const Footer: React.FC = () => {
@@ -66,13 +66,6 @@ export const Footer: React.FC = () => {
               >
                 Contact
               </button>
-              <Link
-                to="/admin"
-                className="text-slate-500 hover:text-slate-300 flex items-center gap-1"
-                title="Organizer Portal"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" /> Portal
-              </Link>
             </div>
           </div>
 
