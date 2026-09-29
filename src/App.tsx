@@ -12,6 +12,7 @@ import { FAQPage } from './pages/FAQPage';
 import { AdminPage } from './pages/AdminPage';
 import { AuthPage } from './pages/AuthPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { AuthProvider } from './context/AuthContext';
 
 // Scroll to top helper on route navigation
@@ -46,7 +47,7 @@ export const App: React.FC = () => {
             <Route path="/signup" element={<AuthPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/admin" element={<AdminPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
         <Footer />

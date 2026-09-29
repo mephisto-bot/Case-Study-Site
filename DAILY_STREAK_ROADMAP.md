@@ -14,7 +14,7 @@ Welcome to your daily engineering streak challenge! Each day represents one bite
 
 - [x] **Day 01** • `feat: add Week 21 case study - Psycho-Cybernetics and dynamic date alignment`
 - [ ] **Day 02** • `feat(seo): add dynamic OpenGraph social cards and JSON-LD schema`
-- [ ] **Day 03** • `feat(ui): create custom 404 NotFound page with smart redirect to latest study`
+- [x] **Day 03** • `feat(ui): create custom 404 NotFound page with smart redirect to latest study`
 - [ ] **Day 04** • `feat(search): add presenter name and week number filtering to GlobalSearchModal`
 - [ ] **Day 05** • `feat(ui): add reading time estimator badge on case study cards`
 - [ ] **Day 06** • `feat(study): add Export/Download Case Study as Markdown button in modal`
@@ -66,10 +66,15 @@ Welcome to your daily engineering streak challenge! Each day represents one bite
 
 ---
 
-### Day 03: Custom 404 NotFound Page
+### Day 03: Custom 404 NotFound Page [COMPLETED]
 - **Target Files:** `src/pages/NotFoundPage.tsx`, `src/App.tsx`
 - **Goal:** Replace default blank page or browser fallback with a branded CIH error page that invites lost users to explore the latest Wednesday session.
-- **Time Estimate:** 12 mins.
+- **Commit Command:**
+  ```bash
+  git add src/pages/NotFoundPage.tsx src/App.tsx DAILY_STREAK_ROADMAP.md
+  git commit -m "feat(ui): create custom 404 NotFound page with smart redirect to latest study"
+  git push origin main
+  ```
 
 ---
 
