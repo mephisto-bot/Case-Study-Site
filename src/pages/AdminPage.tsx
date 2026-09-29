@@ -527,13 +527,38 @@ export const AdminPage: React.FC = () => {
     });
   };
 
+  // Helper to convert Google Drive share links, Dropbox links, and cloud URLs to direct embeddable image URLs
+  const normalizeImageUrl = (url: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+
+    // Google Drive: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+    const gDriveMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (gDriveMatch && gDriveMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${gDriveMatch[1]}`;
+    }
+
+    // Google Drive: https://drive.google.com/open?id=FILE_ID or ?id=FILE_ID
+    const gDriveIdMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (trimmed.includes('drive.google.com') && gDriveIdMatch && gDriveIdMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${gDriveIdMatch[1]}`;
+    }
+
+    // Dropbox: convert ?dl=0 to ?raw=1
+    if (trimmed.includes('dropbox.com')) {
+      return trimmed.replace('?dl=0', '?raw=1').replace('&dl=0', '&raw=1');
+    }
+
+    return trimmed;
+  };
+
   const handleAddEditImageByUrl = () => {
-    const trimmed = newImageUrlInput.trim();
-    if (!trimmed) return;
-    const combined = [...editGallery, trimmed];
+    const normalized = normalizeImageUrl(newImageUrlInput);
+    if (!normalized) return;
+    const combined = [...editGallery, normalized];
     setEditGallery(combined);
     if (!editForm.imageUrl) {
-      setEditForm(prev => ({ ...prev, imageUrl: trimmed }));
+      setEditForm(prev => ({ ...prev, imageUrl: normalized }));
     }
     setNewImageUrlInput('');
   };
@@ -1803,27 +1828,32 @@ export const AdminPage: React.FC = () => {
                       </div>
 
                       {/* Add Image by URL input */}
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newImageUrlInput}
-                          onChange={(e) => setNewImageUrlInput(e.target.value)}
-                          placeholder="Paste an image path or URL (e.g. /images/preparing-the-vessel-1.jpg or https://...)"
-                          className="flex-1 px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white font-mono"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddEditImageByUrl();
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddEditImageByUrl}
-                          className="px-4 py-2 bg-slate-200 hover:bg-navy-900 hover:text-white text-navy-900 text-xs font-bold rounded-xl transition-colors shrink-0"
-                        >
-                          Add URL
-                        </button>
+                      <div className="space-y-1">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newImageUrlInput}
+                            onChange={(e) => setNewImageUrlInput(e.target.value)}
+                            placeholder="Paste Google Drive share link, Cloudinary, ImgBB, or image URL..."
+                            className="flex-1 px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange bg-white font-mono"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddEditImageByUrl();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddEditImageByUrl}
+                            className="px-4 py-2 bg-slate-200 hover:bg-navy-900 hover:text-white text-navy-900 text-xs font-bold rounded-xl transition-colors shrink-0"
+                          >
+                            Add URL
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          ✨ <strong>Cloud links supported:</strong> Google Drive links (set to &quot;Anyone with the link can view&quot;), ImgBB, Cloudinary, Dropbox, or any direct image URL.
+                        </p>
                       </div>
 
                       {/* Gallery Thumbnails Grid */}
