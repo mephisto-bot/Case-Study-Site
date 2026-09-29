@@ -28,13 +28,14 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
       const updated = parsed.map(study => {
         const init = initialMap.get(study.id);
         if (init) {
+          const isPsychoCybernetics = study.id === 'psycho-cybernetics';
           return {
             ...init,
             ...study,
             date: init.date,
             weekNumber: init.weekNumber ?? study.weekNumber,
-            imageUrl: (study.imageUrl && !study.imageUrl.includes('preparing-the-vessel-1.jpg')) ? study.imageUrl : init.imageUrl,
-            galleryImages: (study.galleryImages && study.galleryImages.length > 0 && !study.galleryImages.some(g => g.includes('preparing-the-vessel-1.jpg'))) ? study.galleryImages : init.galleryImages,
+            imageUrl: isPsychoCybernetics ? init.imageUrl : ((study.imageUrl && !study.imageUrl.includes('preparing-the-vessel-1.jpg')) ? study.imageUrl : init.imageUrl),
+            galleryImages: isPsychoCybernetics ? init.galleryImages : ((study.galleryImages && study.galleryImages.length > 0 && !study.galleryImages.some(g => g.includes('preparing-the-vessel-1.jpg'))) ? study.galleryImages : init.galleryImages),
             videoUrl: study.videoUrl !== undefined ? study.videoUrl : init.videoUrl,
             youtubeUrl: study.youtubeUrl !== undefined ? study.youtubeUrl : init.youtubeUrl,
             youtubeVideoId: study.youtubeVideoId !== undefined ? study.youtubeVideoId : init.youtubeVideoId,

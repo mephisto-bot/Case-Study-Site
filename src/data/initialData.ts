@@ -23,11 +23,15 @@ export const initialCaseStudies: CaseStudy[] = [
     date: getPastWednesdayStr(0),
     weekNumber: 21,
     presenter: "CIH Mentorship Board",
-    imageUrl: "/images/psycho-cybernetics.jpg",
+    imageUrl: "/images/psycho-cybernetics-1.png",
     galleryImages: [
-      "/images/psycho-cybernetics.jpg",
-      "/images/cih-photo-1.jpg",
-      "/images/cih-photo-2.jpg"
+      "/images/psycho-cybernetics-1.png",
+      "/images/psycho-cybernetics-2.png",
+      "/images/psycho-cybernetics-3.png",
+      "/images/psycho-cybernetics-4.png",
+      "/images/psycho-cybernetics-5.png",
+      "/images/psycho-cybernetics-6.png",
+      "/images/psycho-cybernetics.jpg"
     ],
     excerpt: "Drawing from Dr. Maxwell Maltz's groundbreaking book Psycho-Cybernetics, this session dissected the powerful metaphor of the human mind as a ship: why your subconscious operates as an automatic steering servomechanism, how self-image acts as the master rudder, and how young leaders can actively steer their lives rather than drifting on autopilot.",
     fullContent: "In this deeply impactful Wednesday Case Study session at Community Innovation Hub, participants explored the transformative principles of Dr. Maxwell Maltz's 1960 classic, 'Psycho-Cybernetics'. Dr. Maltz, a plastic surgeon, discovered that changing a patient's physical appearance often failed to change their life unless their internal self-image was also transformed.\n\nThe core of the session centered on a vivid, unforgettable metaphor: the human mind is like a grand ship traversing unpredictable ocean waters, powered by an automatic guidance system (cybernetics, derived from the ancient Greek 'kybernetes', meaning 'steersman' or 'helmsman').\n\nParticipants unpacked how servomechanisms function: systems designed to steer toward a preset goal and automatically correct course when thrown off-track by wind and waves. The mentors explained that the human subconscious is a neutral servomechanism. It does not judge whether your destination is constructive or destructive—it simply steers toward whatever picture is programmed into your internal self-image. If your self-image is anchored in inadequacy or fear, your automatic mechanism will sabotage opportunities and steer you right back toward failure.\n\nThe room engaged in breakout syndicate pods to analyze why willpower alone so frequently fails. Willpower is like fighting the steering wheel while the autopilot rudder is locked in the opposite direction. True, lasting breakthrough requires updating the coordinates and recalibrating the self-image.\n\nKey practical frameworks covered included:\n• The Steersman Role: Recognizing that you are the captain at the helm, and your conscious mind chooses the target while the subconscious executes the navigation.\n• Mental Rehearsal (Synthetic Experience): Dr. Maltz showed that the human nervous system cannot tell the difference between a vividly imagined experience and a real one. Fellows practiced visualizing poise and precision before high-stakes pitches, exams, and interviews.\n• Reframing Mistakes as Navigation Data: Just as a ship is off-course 90% of the voyage and relies on continuous micro-adjustments, mistakes are not indictments of identity—they are simply navigational feedback signals.\n• De-Hypnotizing from Limiting Beliefs: Releasing outdated labels, past failures, and emotional anchors that keep people stranded in safe harbors.",
