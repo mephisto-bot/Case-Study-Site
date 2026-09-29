@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, Shield, Sparkles, User, HeartHandshake } from 'lucide-react';
+import { Menu, X, Search, Sparkles, User, HeartHandshake } from 'lucide-react';
 import { GlobalSearchModal } from '../common/GlobalSearchModal';
 import { useAuth } from '../../context/AuthContext';
 import { fetchCloudAdminData } from '../../services/api';
@@ -16,19 +16,7 @@ export const Navbar: React.FC = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
-  // Admin authentication state (only visible to authenticated admin)
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('cih_admin_auth') === 'true';
-  });
 
-  useEffect(() => {
-    const checkAdmin = () => {
-      setIsAdminAuthenticated(sessionStorage.getItem('cih_admin_auth') === 'true');
-    };
-    checkAdmin();
-    window.addEventListener('storage', checkAdmin);
-    return () => window.removeEventListener('storage', checkAdmin);
-  }, [location.pathname]);
 
   // Secret Hotkey: Ctrl + Shift + A (or Cmd + Shift + A) to access Admin Portal
   useEffect(() => {
@@ -172,17 +160,7 @@ export const Navbar: React.FC = () => {
                 <span className="hidden 2xl:inline text-slate-400">Search</span>
               </button>
 
-              {/* Organizer Portal button - visible ONLY when already authenticated as admin */}
-              {isAdminAuthenticated && (
-                <Link
-                  to="/admin"
-                  title="Organizer Portal (Logged In)"
-                  className="p-2 text-brand-orange hover:text-brand-orange-hover hover:bg-brand-orange/10 rounded-xl transition-colors relative"
-                >
-                  <Shield className="w-4 h-4" />
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                </Link>
-              )}
+
 
               {/* Authentication Actions */}
               {isAuthenticated && user ? (
@@ -371,17 +349,7 @@ export const Navbar: React.FC = () => {
 
             {/* Drawer Footer Links */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between px-2">
-              {isAdminAuthenticated ? (
-                <Link
-                  to="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-xs text-brand-orange font-semibold flex items-center gap-1.5 py-1"
-                >
-                  <Shield className="w-3.5 h-3.5" /> Organizer Portal
-                </Link>
-              ) : (
-                <div />
-              )}
+              <span className="text-xs text-slate-400">CIH Case Study</span>
               <a
                 href="https://cih.com.ng"
                 target="_blank"
