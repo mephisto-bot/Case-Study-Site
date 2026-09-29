@@ -24,13 +24,28 @@ import { TestimonialsSection } from '../components/common/TestimonialsSection';
 import { SessionVideoPlayer } from '../components/common/SessionVideoPlayer';
 
 export const HomePage: React.FC = () => {
-  const [caseStudies] = useState<CaseStudy[]>(getStoredCaseStudies());
-  const [upcomingSession] = useState<UpcomingSession>(getStoredUpcomingSession());
+  const [caseStudies, setCaseStudies] = useState<CaseStudy[]>(getStoredCaseStudies);
+  const [upcomingSession, setUpcomingSession] = useState<UpcomingSession>(getStoredUpcomingSession);
   const [selectedStudy, setSelectedStudy] = useState<CaseStudy | null>(null);
   const [upcomingModalOpen, setUpcomingModalOpen] = useState(false);
   const [topicModalOpen, setTopicModalOpen] = useState(false);
   const [showAllResources, setShowAllResources] = useState(false);
   const [showAllHighlights, setShowAllHighlights] = useState(false);
+
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      setCaseStudies(getStoredCaseStudies());
+      setUpcomingSession(getStoredUpcomingSession());
+    };
+    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('cih_case_studies_updated', handleUpdate);
+    window.addEventListener('cih_upcoming_session_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('cih_case_studies_updated', handleUpdate);
+      window.removeEventListener('cih_upcoming_session_updated', handleUpdate);
+    };
+  }, []);
 
   const sortedStudies = React.useMemo(() => {
     return [...caseStudies].sort((a, b) => (b.weekNumber || 0) - (a.weekNumber || 0));
@@ -39,12 +54,13 @@ export const HomePage: React.FC = () => {
   const recentStudy = sortedStudies[0] || null;
   const videoStudy = sortedStudies.find(c => c.videoUrl || c.youtubeUrl || c.youtubeVideoId) || recentStudy;
 
-  // Highlights cards for home page
-  const highlights = [
-    caseStudies.find(c => c.id === 'can-machines-think-turing') || caseStudies[0],
-    caseStudies.find(c => c.id === 'iq-vs-eq-leadership') || caseStudies[1],
-    caseStudies.find(c => c.id === 'financial-literacy-youth') || caseStudies[2],
-  ].filter(Boolean);
+  // Dynamic highlights: prioritize featured case studies, then most recent studies
+  const highlights = React.useMemo(() => {
+    const featured = sortedStudies.filter(c => c.featured);
+    const nonFeatured = sortedStudies.filter(c => !c.featured);
+    const combined = [...featured, ...nonFeatured];
+    return combined.slice(0, 6);
+  }, [sortedStudies]);
 
   const resourceCards = [
     {
@@ -172,7 +188,7 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 1.5 Live Session Spotlight (De-cluttered on mobile, full dual-grid on desktop) */}
+      {/* 1.5 Live Session Spotlight (Dual Grid on All Screen Sizes) */}
       <section className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/80 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3">
@@ -182,7 +198,7 @@ export const HomePage: React.FC = () => {
                 <span>Live Session Spotlight</span>
               </div>
               <h2 className="text-xl sm:text-3xl font-extrabold text-navy-900 tracking-tight mt-1">
-                Upcoming Case Study
+                Upcoming Case Study &amp; Latest Session
               </h2>
             </div>
             <p className="hidden sm:block text-xs sm:text-sm text-slate-500 font-semibold">
@@ -190,56 +206,22 @@ export const HomePage: React.FC = () => {
             </p>
           </div>
 
-          {/* Mobile View: Single Compact Highlight Card (No Noise) */}
-          <div className="block lg:hidden">
-            <div className="rounded-2xl bg-navy-900 text-white p-5 shadow-lg border border-navy-800 relative space-y-3.5 overflow-hidden">
-              <div className="flex items-center justify-between gap-2">
-                <WednesdayCountdown />
-                <span className="text-[10px] text-slate-400 font-bold uppercase">
-                  {upcomingSession.weekTitle ? upcomingSession.weekTitle.split('•')[0].trim() : 'Week 19'}
-                </span>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold text-white leading-snug">
-                  {upcomingSession.topicTitle}
-                </h3>
-                <p className="text-xs text-slate-300 mt-1 line-clamp-2">
-                  {upcomingSession.description}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
-                <span className="text-[11px] text-slate-300 flex items-center gap-1 font-semibold">
-                  <Calendar className="w-3.5 h-3.5 text-brand-orange" />
-                  Wednesdays 10am
-                </span>
-                <Link
-                  to="/register"
-                  className="px-4 py-2 rounded-lg bg-brand-orange text-white text-xs font-bold shadow active:scale-95"
-                >
-                  Register Free Seat
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop Dual Grid: Card 1 (Upcoming Wednesday) & Card 2 (Most Recent Study) */}
-          <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Dual Grid: Card 1 (Upcoming Wednesday) & Card 2 (Most Recent Study with Cover Photo) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {/* 1. UPCOMING CASE STUDY CARD WITH LIVE COUNTDOWN TIMER */}
-            <div className="relative rounded-3xl bg-navy-900 text-white p-7 sm:p-8 shadow-xl overflow-hidden border border-navy-800 flex flex-col justify-between group">
+            <div className="relative rounded-3xl bg-navy-900 text-white p-6 sm:p-8 shadow-xl overflow-hidden border border-navy-800 flex flex-col justify-between group">
               <div className="absolute top-0 right-0 w-80 h-80 bg-brand-orange/15 rounded-full blur-3xl pointer-events-none" />
               
               <div className="space-y-4 relative z-10">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <WednesdayCountdown />
                   <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
-                    {upcomingSession.weekTitle ? upcomingSession.weekTitle.split('•')[0].trim() : 'Week 19'}
+                    {upcomingSession.weekTitle ? upcomingSession.weekTitle.split('•')[0].trim() : 'Week 22'}
                   </span>
                 </div>
 
                 <div>
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-white leading-snug">
+                  <h3 className="text-xl sm:text-3xl font-extrabold text-white leading-snug">
                     {upcomingSession.topicTitle}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
@@ -279,7 +261,7 @@ export const HomePage: React.FC = () => {
             {recentStudy && (
               <div
                 onClick={() => setSelectedStudy(recentStudy)}
-                className="relative rounded-3xl bg-white p-7 sm:p-8 shadow-md border border-slate-200/80 hover:border-brand-orange/40 hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between group"
+                className="relative rounded-3xl bg-white p-6 sm:p-8 shadow-md border border-slate-200/80 hover:border-brand-orange/40 hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between group"
               >
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -300,13 +282,16 @@ export const HomePage: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="relative h-44 sm:h-48 rounded-2xl overflow-hidden bg-navy-900">
+                  <div className="relative h-44 sm:h-52 rounded-2xl overflow-hidden bg-navy-900 border border-slate-100">
                     <img
                       src={recentStudy.imageUrl}
                       alt={recentStudy.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/images/cih-photo-1.jpg';
+                      }}
                     />
-                    <div className="absolute top-3 left-3 px-3 py-1 rounded-md bg-navy-900/90 backdrop-blur-sm text-white text-xs font-bold">
+                    <div className="absolute top-3 left-3 px-3 py-1 rounded-md bg-navy-900/90 backdrop-blur-sm text-white text-xs font-bold shadow">
                       {recentStudy.sector}
                     </div>
                     {(recentStudy.videoUrl || recentStudy.youtubeUrl || recentStudy.youtubeVideoId) && (

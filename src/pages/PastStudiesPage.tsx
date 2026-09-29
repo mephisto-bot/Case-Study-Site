@@ -27,12 +27,24 @@ import { CaseStudy } from '../types';
 import { CaseStudyModal } from '../components/common/CaseStudyModal';
 
 export const PastStudiesPage: React.FC = () => {
-  const [caseStudies] = useState<CaseStudy[]>(getStoredCaseStudies());
+  const [caseStudies, setCaseStudies] = useState<CaseStudy[]>(getStoredCaseStudies);
   const [selectedSector, setSelectedSector] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [visibleCount, setVisibleCount] = useState<number>(6);
   const [activeStudy, setActiveStudy] = useState<CaseStudy | null>(null);
   const [showAllTags, setShowAllTags] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setCaseStudies(getStoredCaseStudies());
+    };
+    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('cih_case_studies_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('cih_case_studies_updated', handleUpdate);
+    };
+  }, []);
 
   // Auto-open study if shared via link with ?study=id
   useEffect(() => {

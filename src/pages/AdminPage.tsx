@@ -1426,35 +1426,60 @@ export const AdminPage: React.FC = () => {
                       </span>
                     </div>
 
+                    {/* Add Mode: Dedicated Active Cover Preview */}
+                    {uploadedGallery.length > 0 && (
+                      <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-emerald-50/70 border border-emerald-300 rounded-xl mb-3">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-900 shrink-0 border-2 border-emerald-500 shadow-sm relative">
+                          <img
+                            src={newStudy.imageUrl || uploadedGallery[0]}
+                            alt="Cover preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] font-bold text-center py-0.2 uppercase">
+                            Cover
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-700 space-y-0.5">
+                          <span className="font-extrabold text-emerald-700">✓ Primary Cover Photo Selected</span>
+                          <p className="text-[11px] text-slate-500">Click any photo below to choose a different cover.</p>
+                        </div>
+                      </div>
+                    )}
+
                     {uploadedGallery.length > 0 && (
                       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
                         {uploadedGallery.map((imgUrl, idx) => {
-                          const isCover = newStudy.imageUrl === imgUrl;
+                          const isCover = newStudy.imageUrl === imgUrl || (!newStudy.imageUrl && idx === 0);
                           return (
-                            <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-square bg-slate-100">
+                            <div
+                              key={idx}
+                              onClick={() => handleSetCoverImage(imgUrl)}
+                              className={`relative group rounded-lg overflow-hidden aspect-square bg-slate-100 cursor-pointer select-none transition-all ${
+                                isCover
+                                  ? 'ring-4 ring-emerald-500 border-2 border-emerald-500 shadow scale-[1.02]'
+                                  : 'border border-slate-200 hover:ring-2 hover:ring-brand-orange'
+                              }`}
+                              title={isCover ? "Current Cover Photo" : "Click to select as Cover Photo"}
+                            >
                               <img src={imgUrl} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-navy-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
-                                {!isCover && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetCoverImage(imgUrl)}
-                                    className="px-1.5 py-0.5 rounded bg-brand-orange text-white text-[9px] font-bold shadow"
-                                  >
-                                    Set Cover
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveGalleryImage(idx)}
-                                  className="p-1 rounded bg-rose-600 text-white text-[9px]"
-                                  title="Remove photo"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                              {isCover && (
-                                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[8px] font-bold shadow">
-                                  Cover
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveGalleryImage(idx);
+                                }}
+                                className="absolute top-1 right-1 p-1 rounded bg-rose-600/90 text-white text-[9px] hover:bg-rose-700 shadow"
+                                title="Remove photo"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                              {isCover ? (
+                                <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[8px] font-bold shadow flex items-center gap-0.5">
+                                  ✓ Cover
+                                </span>
+                              ) : (
+                                <span className="absolute inset-x-0 bottom-0 bg-navy-950/70 text-white text-[8px] py-0.5 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  Set Cover
                                 </span>
                               )}
                             </div>
@@ -1856,10 +1881,42 @@ export const AdminPage: React.FC = () => {
                         </p>
                       </div>
 
+                      {/* Active Cover Image Preview Box */}
+                      {editGallery.length > 0 && (
+                        <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-2xl shadow-xs">
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-slate-900 shrink-0 border-2 border-emerald-500 shadow-md relative">
+                            <img
+                              src={editForm.imageUrl || editGallery[0] || '/images/cih-photo-1.jpg'}
+                              alt="Current Cover"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/images/cih-photo-1.jpg';
+                              }}
+                            />
+                            <span className="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[9px] font-extrabold text-center py-0.5 uppercase tracking-wider">
+                              Cover Photo
+                            </span>
+                          </div>
+                          <div className="text-center sm:text-left space-y-1">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-600 text-white text-[11px] font-extrabold rounded-md uppercase tracking-wider shadow-xs">
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Current Primary Cover</span>
+                            </div>
+                            <h5 className="text-xs sm:text-sm font-bold text-slate-800">
+                              This image appears on the Home Page and Past Studies cards.
+                            </h5>
+                            <p className="text-[11px] text-slate-600">
+                              👉 <strong>To change the cover:</strong> Simply click on any photo in the gallery below. The green border will highlight your selection!
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Gallery Thumbnails Grid */}
                       <div className="pt-1">
-                        <div className="text-xs font-bold text-slate-600 mb-2">
-                          {editGallery.length} Image(s) in Gallery:
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-2">
+                          <span>{editGallery.length} Image(s) in Gallery:</span>
+                          <span className="text-slate-400 font-normal text-[11px]">Click any photo to make it the cover</span>
                         </div>
 
                         {editGallery.length === 0 ? (
@@ -1867,11 +1924,20 @@ export const AdminPage: React.FC = () => {
                             No images in gallery yet. Upload photos from your device or paste image URLs above.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-64 overflow-y-auto p-2.5 bg-white rounded-xl border border-slate-200">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-72 overflow-y-auto p-2.5 bg-white rounded-xl border border-slate-200">
                             {editGallery.map((imgUrl, idx) => {
                               const isCover = editForm.imageUrl === imgUrl || (!editForm.imageUrl && idx === 0);
                               return (
-                                <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-100 shadow-xs">
+                                <div
+                                  key={idx}
+                                  onClick={() => handleEditSetCoverImage(imgUrl)}
+                                  className={`relative group rounded-xl overflow-hidden aspect-square bg-slate-100 transition-all cursor-pointer select-none ${
+                                    isCover
+                                      ? 'ring-4 ring-emerald-500 border-2 border-emerald-500 shadow-md scale-[1.02]'
+                                      : 'border border-slate-200 hover:ring-2 hover:ring-brand-orange hover:shadow-sm'
+                                  }`}
+                                  title={isCover ? "Current Cover Image" : "Click to select as Cover Image"}
+                                >
                                   <img
                                     src={imgUrl}
                                     alt={`Gallery photo ${idx + 1}`}
@@ -1880,29 +1946,29 @@ export const AdminPage: React.FC = () => {
                                       (e.target as HTMLImageElement).src = '/images/cih-photo-1.jpg';
                                     }}
                                   />
-                                  <div className="absolute inset-0 bg-navy-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
-                                    {!isCover && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleEditSetCoverImage(imgUrl)}
-                                        className="px-2 py-0.5 rounded bg-brand-orange text-white text-[10px] font-bold shadow"
-                                      >
-                                        Set Cover
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleEditRemoveGalleryImage(idx)}
-                                      className="p-1 rounded bg-rose-600 text-white text-xs hover:bg-rose-700"
-                                      title="Remove Photo"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                  {isCover && (
-                                    <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-extrabold uppercase shadow">
-                                      Cover
-                                    </span>
+
+                                  {/* Delete Button */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditRemoveGalleryImage(idx);
+                                    }}
+                                    className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-rose-600/90 hover:bg-rose-600 text-white text-xs opacity-80 hover:opacity-100 shadow transition-opacity"
+                                    title="Remove Photo"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {isCover ? (
+                                    <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[9px] font-extrabold uppercase shadow flex items-center gap-1">
+                                      <CheckCircle className="w-2.5 h-2.5" />
+                                      <span>Cover</span>
+                                    </div>
+                                  ) : (
+                                    <div className="absolute inset-x-0 bottom-0 bg-navy-950/75 py-1 text-center text-white text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                      Click to set Cover
+                                    </div>
                                   )}
                                 </div>
                               );

@@ -28,14 +28,23 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
       const updated = parsed.map(study => {
         const init = initialMap.get(study.id);
         if (init) {
-          const isPsychoCybernetics = study.id === 'psycho-cybernetics';
+          // If stored image is an obsolete placeholder, upgrade to initial data; otherwise preserve user's chosen cover
+          const isDiscardedPlaceholder = study.imageUrl === '/images/preparing-the-vessel-1.jpg' || study.imageUrl === '/images/psycho-cybernetics.jpg';
+          const validCover = (study.imageUrl && !isDiscardedPlaceholder) ? study.imageUrl : init.imageUrl;
+
+          // Preserve user-saved gallery unless empty or obsolete
+          const hasDiscardedGallery = study.galleryImages && study.galleryImages.length === 1 && (study.galleryImages[0] === '/images/preparing-the-vessel-1.jpg' || study.galleryImages[0] === '/images/psycho-cybernetics.jpg');
+          const validGallery = (study.galleryImages && study.galleryImages.length > 0 && !hasDiscardedGallery)
+            ? study.galleryImages
+            : (init.galleryImages || [validCover]);
+
           return {
             ...init,
             ...study,
-            date: init.date,
-            weekNumber: init.weekNumber ?? study.weekNumber,
-            imageUrl: isPsychoCybernetics ? init.imageUrl : ((study.imageUrl && !study.imageUrl.includes('preparing-the-vessel-1.jpg')) ? study.imageUrl : init.imageUrl),
-            galleryImages: isPsychoCybernetics ? init.galleryImages : ((study.galleryImages && study.galleryImages.length > 0 && !study.galleryImages.some(g => g.includes('preparing-the-vessel-1.jpg'))) ? study.galleryImages : init.galleryImages),
+            date: study.date || init.date,
+            weekNumber: study.weekNumber ?? init.weekNumber,
+            imageUrl: validCover,
+            galleryImages: validGallery,
             videoUrl: study.videoUrl !== undefined ? study.videoUrl : init.videoUrl,
             youtubeUrl: study.youtubeUrl !== undefined ? study.youtubeUrl : init.youtubeUrl,
             youtubeVideoId: study.youtubeVideoId !== undefined ? study.youtubeVideoId : init.youtubeVideoId,
@@ -51,7 +60,6 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
       const newStudies = initialCaseStudies.filter((s) => !existingIds.has(s.id));
       const finalStudies = [...newStudies, ...updated];
       finalStudies.sort((a, b) => (b.weekNumber || 0) - (a.weekNumber || 0));
-      localStorage.setItem(CASE_STUDIES_KEY, JSON.stringify(finalStudies));
       return finalStudies;
     }
   } catch (err) {
@@ -65,6 +73,9 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
 export const saveStoredCaseStudies = (studies: CaseStudy[]): boolean => {
   try {
     localStorage.setItem(CASE_STUDIES_KEY, JSON.stringify(studies));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('cih_case_studies_updated'));
+    }
     return true;
   } catch (err: any) {
     console.error('Error saving case studies to localStorage', err);
