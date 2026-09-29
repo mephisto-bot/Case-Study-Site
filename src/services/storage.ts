@@ -61,11 +61,16 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
   return result;
 };
 
-export const saveStoredCaseStudies = (studies: CaseStudy[]): void => {
+export const saveStoredCaseStudies = (studies: CaseStudy[]): boolean => {
   try {
     localStorage.setItem(CASE_STUDIES_KEY, JSON.stringify(studies));
-  } catch (err) {
-    console.error('Error saving case studies', err);
+    return true;
+  } catch (err: any) {
+    console.error('Error saving case studies to localStorage', err);
+    if (typeof window !== 'undefined' && (err?.name === 'QuotaExceededError' || err?.code === 22)) {
+      alert('Browser storage quota exceeded! The images uploaded are too large to fit in browser memory. Please use compressed images or image URLs.');
+    }
+    return false;
   }
 };
 

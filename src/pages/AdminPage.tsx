@@ -336,22 +336,51 @@ export const AdminPage: React.FC = () => {
     setPasscode('');
   };
 
+  // Helper to compress uploaded images via HTML5 Canvas to prevent hitting localStorage 5MB quota
+  const compressImageFile = (file: File, maxWidth = 1280, quality = 0.72): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(e.target?.result as string);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Case Study Multiple Local Images Upload Handler (>= 10 images)
   const handleImageFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const fileList = Array.from(files);
-    const readers = fileList.map(file => {
-      return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(readers).then(newImages => {
-      const combined = [...uploadedGallery, ...newImages];
+    Promise.all(fileList.map(file => compressImageFile(file))).then(newImages => {
+      const validImages = newImages.filter(Boolean);
+      const combined = [...uploadedGallery, ...validImages];
       setUploadedGallery(combined);
       if (!newStudy.imageUrl && combined.length > 0) {
         setNewStudy(prev => ({ ...prev, imageUrl: combined[0] }));
@@ -488,16 +517,9 @@ export const AdminPage: React.FC = () => {
     if (!files || files.length === 0) return;
 
     const fileList = Array.from(files);
-    const readers = fileList.map(file => {
-      return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(readers).then(newImages => {
-      const combined = [...editGallery, ...newImages];
+    Promise.all(fileList.map(file => compressImageFile(file))).then(newImages => {
+      const validImages = newImages.filter(Boolean);
+      const combined = [...editGallery, ...validImages];
       setEditGallery(combined);
       if (!editForm.imageUrl && combined.length > 0) {
         setEditForm(prev => ({ ...prev, imageUrl: combined[0] }));
