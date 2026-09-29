@@ -31,10 +31,10 @@ export const getStoredCaseStudies = (): CaseStudy[] => {
           return {
             ...init,
             ...study,
-            date: study.date || init.date,
-            weekNumber: study.weekNumber ?? init.weekNumber,
-            imageUrl: study.imageUrl || init.imageUrl,
-            galleryImages: (study.galleryImages && study.galleryImages.length > 0) ? study.galleryImages : init.galleryImages,
+            date: init.date,
+            weekNumber: init.weekNumber ?? study.weekNumber,
+            imageUrl: (study.imageUrl && !study.imageUrl.includes('preparing-the-vessel-1.jpg')) ? study.imageUrl : init.imageUrl,
+            galleryImages: (study.galleryImages && study.galleryImages.length > 0 && !study.galleryImages.some(g => g.includes('preparing-the-vessel-1.jpg'))) ? study.galleryImages : init.galleryImages,
             videoUrl: study.videoUrl !== undefined ? study.videoUrl : init.videoUrl,
             youtubeUrl: study.youtubeUrl !== undefined ? study.youtubeUrl : init.youtubeUrl,
             youtubeVideoId: study.youtubeVideoId !== undefined ? study.youtubeVideoId : init.youtubeVideoId,
@@ -146,6 +146,16 @@ export const getStoredFeedback = (): CaseStudyFeedback[] => {
     console.error('Error loading feedback', err);
   }
   return [
+    {
+      id: 'fb-pc-1',
+      caseStudyId: 'psycho-cybernetics',
+      userName: 'Tolani Adeleke',
+      userEmail: 'tolani.a@example.com',
+      comment: 'The analogy of the mind as a ship with an automatic guidance system completely rewired how I view self-sabotage. You cannot turn the rudder if your self-image is anchored in past failure!',
+      createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+      adminReply: 'Brilliant insight Tolani! The steersman principle (kybernetes) is all about feeding conscious target coordinates instead of drifting on subconscious autopilot.',
+      adminRepliedAt: new Date(Date.now() - 86400000 * 1).toISOString()
+    },
     {
       id: 'fb-0',
       caseStudyId: 'the-elevator-pitch',

@@ -2,7 +2,7 @@ import { CaseStudy, TopicModule, UpcomingSession, FAQItem, Testimonial } from '.
 import { getUpcomingWednesdayFormatted, getPastWednesdayStr } from '../utils/dateHelpers';
 
 export const initialUpcomingSession: UpcomingSession = {
-  weekTitle: "WEEK 21 • UPCOMING SESSION",
+  weekTitle: "WEEK 22 • UPCOMING SESSION",
   badgeText: "NEXT WEDNESDAY",
   topicTitle: "Mindset & Problem Framing",
   dateStr: getUpcomingWednesdayFormatted(),
@@ -15,19 +15,50 @@ export const initialUpcomingSession: UpcomingSession = {
 
 export const initialCaseStudies: CaseStudy[] = [
   {
+    id: "psycho-cybernetics",
+    title: "Case Study: Psycho-Cybernetics",
+    subtitle: "The Mind as a Ship: Steering Your Subconscious Guidance System & Rewiring Self-Image",
+    sector: "Cognitive Agility & Mindset",
+    tagColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    date: getPastWednesdayStr(0),
+    weekNumber: 21,
+    presenter: "CIH Mentorship Board",
+    imageUrl: "/images/psycho-cybernetics.jpg",
+    galleryImages: [
+      "/images/psycho-cybernetics.jpg",
+      "/images/cih-photo-1.jpg",
+      "/images/cih-photo-2.jpg"
+    ],
+    excerpt: "Drawing from Dr. Maxwell Maltz's groundbreaking book Psycho-Cybernetics, this session dissected the powerful metaphor of the human mind as a ship: why your subconscious operates as an automatic steering servomechanism, how self-image acts as the master rudder, and how young leaders can actively steer their lives rather than drifting on autopilot.",
+    fullContent: "In this deeply impactful Wednesday Case Study session at Community Innovation Hub, participants explored the transformative principles of Dr. Maxwell Maltz's 1960 classic, 'Psycho-Cybernetics'. Dr. Maltz, a plastic surgeon, discovered that changing a patient's physical appearance often failed to change their life unless their internal self-image was also transformed.\n\nThe core of the session centered on a vivid, unforgettable metaphor: the human mind is like a grand ship traversing unpredictable ocean waters, powered by an automatic guidance system (cybernetics, derived from the ancient Greek 'kybernetes', meaning 'steersman' or 'helmsman').\n\nParticipants unpacked how servomechanisms function: systems designed to steer toward a preset goal and automatically correct course when thrown off-track by wind and waves. The mentors explained that the human subconscious is a neutral servomechanism. It does not judge whether your destination is constructive or destructive—it simply steers toward whatever picture is programmed into your internal self-image. If your self-image is anchored in inadequacy or fear, your automatic mechanism will sabotage opportunities and steer you right back toward failure.\n\nThe room engaged in breakout syndicate pods to analyze why willpower alone so frequently fails. Willpower is like fighting the steering wheel while the autopilot rudder is locked in the opposite direction. True, lasting breakthrough requires updating the coordinates and recalibrating the self-image.\n\nKey practical frameworks covered included:\n• The Steersman Role: Recognizing that you are the captain at the helm, and your conscious mind chooses the target while the subconscious executes the navigation.\n• Mental Rehearsal (Synthetic Experience): Dr. Maltz showed that the human nervous system cannot tell the difference between a vividly imagined experience and a real one. Fellows practiced visualizing poise and precision before high-stakes pitches, exams, and interviews.\n• Reframing Mistakes as Navigation Data: Just as a ship is off-course 90% of the voyage and relies on continuous micro-adjustments, mistakes are not indictments of identity—they are simply navigational feedback signals.\n• De-Hypnotizing from Limiting Beliefs: Releasing outdated labels, past failures, and emotional anchors that keep people stranded in safe harbors.",
+    keyTakeaways: [
+      "The Steersman Principle (Kybernetes): Your subconscious is a creative automatic mechanism; your conscious mind must actively supply the target coordinates.",
+      "Self-Image is the Master Rudder: You will never consistently outperform your internal self-image; upgrade your self-concept to expand your achievements.",
+      "Willpower vs Identity: Fighting bad habits with brute willpower is exhausting; reprogramming the self-image turns desired behavior into natural steering.",
+      "Synthetic Experience & Visualization: Vivid mental rehearsal stimulates the same neural pathways as real-world execution, building confidence before the storm.",
+      "Mistakes as Servo-Feedback: Errors are not personal failures; they are navigational course-correction cues to guide you closer to the target."
+    ],
+    discussionQuestions: [
+      "If your subconscious is an automatic guidance system, what destination coordinates are your daily thoughts and micro-habits currently feeding into it?",
+      "In what areas of your career or personal leadership have you been trying to 'muscle through' with willpower instead of updating your underlying self-image?",
+      "How can you apply the 'synthetic experience' technique (vivid mental rehearsal) to prepare for an upcoming high-stakes challenge this month?"
+    ],
+    featured: true
+  },
+  {
     id: "preparing-the-vessel",
     title: "Case Study: Preparing the Vessel",
     subtitle: "Building capacity and positioning yourself to receive and sustain greater things",
     sector: "Personal Growth & Productivity",
     tagColor: "bg-teal-50 text-teal-700 border-teal-200",
-    date: getPastWednesdayStr(0),
+    date: getPastWednesdayStr(1),
     weekNumber: 20,
     presenter: "Kenny",
-    imageUrl: "/images/preparing-the-vessel-1.jpg",
+    imageUrl: "/images/cih-photo-11.jpg",
     galleryImages: [
-      "/images/preparing-the-vessel-1.jpg",
-      "/images/preparing-the-vessel-2.jpg",
-      "/images/preparing-the-vessel-3.jpg"
+      "/images/cih-photo-11.jpg",
+      "/images/cih-photo-12.jpg",
+      "/images/cih-photo-13.jpg"
     ],
     excerpt: "Inspired by the biblical story of the widow's oil, this session unpacked how individuals must deliberately build internal capacity — skills, mindset, and character — before they can hold and sustain greater opportunities.",
     fullContent: "In this deeply inspiring session, Kenny drew on the timeless biblical account of the widow who told the prophet Elisha she had nothing but a small jar of oil. Elisha instructed her to gather as many empty vessels as possible from her neighbours — and miraculously, the oil kept flowing until every vessel was full. The moment the last container was filled, the oil stopped.\n\nThe lesson the session drove home: the oil did not run out — the vessels did. This became a powerful metaphor for the lives of young professionals and aspiring leaders. God, the universe, or any higher opportunity-granting force cannot pour more into you than the vessel you have prepared to receive it.\n\nParticipants explored what it means to 'prepare your vessel' in practical, everyday terms — from investing in education, skills and emotional intelligence, to cultivating discipline, integrity and a growth mindset. The session challenged everyone in the room to audit their current capacity: Are you expanding your container, or are you expecting a greater outpouring into the same limited vessel?\n\nKenny facilitated a rich group discussion on how preparation precedes promotion — and how many people pray for open doors without doing the inner work to walk confidently through them when they arrive. Real-world examples were drawn from business, career development, and personal leadership to show how capacity building is not a one-time event but a continuous, intentional lifestyle.",
@@ -51,7 +82,7 @@ export const initialCaseStudies: CaseStudy[] = [
     subtitle: "Goal Planning & Progressive Execution through 30-Day Action Blueprints",
     sector: "Personal Growth & Productivity",
     tagColor: "bg-purple-50 text-purple-700 border-purple-200",
-    date: getPastWednesdayStr(1),
+    date: getPastWednesdayStr(2),
     weekNumber: 19,
     imageUrl: "/images/cih-photo-1.jpg",
     galleryImages: [
@@ -79,7 +110,7 @@ export const initialCaseStudies: CaseStudy[] = [
     subtitle: "Internal projects showcase by Hub Interns & ITs, and the digital debut of the CIH Case Study platform",
     sector: "Communication & Media",
     tagColor: "bg-orange-50 text-brand-orange border-orange-200",
-    date: getPastWednesdayStr(1),
+    date: getPastWednesdayStr(3),
     weekNumber: 18,
     imageUrl: "/images/elevator-pitch-presenter.jpg",
     galleryImages: [
@@ -109,7 +140,7 @@ export const initialCaseStudies: CaseStudy[] = [
     subtitle: "Character, integrity, and authentic youth leadership in modern society",
     sector: "Ethics & Leadership",
     tagColor: "bg-blue-50 text-blue-700 border-blue-200",
-    date: getPastWednesdayStr(1),
+    date: getPastWednesdayStr(4),
     weekNumber: 17,
     imageUrl: "/images/cih-photo-1.jpg",
     galleryImages: [

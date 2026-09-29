@@ -19,7 +19,8 @@ import {
   Leaf,
   ShieldAlert,
   Heart,
-  Play
+  Play,
+  Compass
 } from 'lucide-react';
 import { getStoredCaseStudies } from '../services/storage';
 import { CaseStudy } from '../types';
@@ -50,6 +51,8 @@ export const PastStudiesPage: React.FC = () => {
 
   const sectors = [
     'All',
+    'Cognitive Agility & Mindset',
+    'Personal Growth & Productivity',
     'Ethics & Leadership',
     'Personal Growth & EQ',
     'Tech & Artificial Intelligence',
@@ -61,6 +64,7 @@ export const PastStudiesPage: React.FC = () => {
   ];
 
   const topicsList = [
+    { title: 'Psycho-Cybernetics & Mind Direction', tag: 'Cybernetics', icon: Compass, desc: 'Steering the subconscious guidance system, upgrading self-image, and mastering personal direction.' },
     { title: 'Leadership & Adaptive Governance', tag: 'Leadership', icon: Award, desc: 'Decentralized leadership, accountability, and decision-making under uncertainty.' },
     { title: 'Time Management & Prioritization', tag: 'Productivity', icon: Clock, desc: 'Eisenhower Matrix, Deep Work principles, and time-blocking for high achievers.' },
     { title: 'Capacity Building & Institutional Growth', tag: 'Growth', icon: TrendingUp, desc: 'Empowering community organizations, mentorship pipelines, and sustainable scaling.' },
